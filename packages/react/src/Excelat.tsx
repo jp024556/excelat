@@ -802,7 +802,7 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
 
     return (
       <div
-        className={`excelat-container excelat-mode-${mode} ${className}`}
+        className={`excelat excelat-container excelat-mode-${mode} ${className}`}
         style={style}
         onMouseUp={stopDrag}
       >

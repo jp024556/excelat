@@ -13,13 +13,14 @@
   --excelat-header-selected-text: #0f5132;
   --excelat-cell-bg: #ffffff;
   --excelat-cell-text: #1e293b;
-  --excelat-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --excelat-font: inherit;
   --excelat-font-size: 13px;
   --excelat-row-height: 25px;
   --excelat-col-width: 100px;
   --excelat-row-header-width: 46px;
 }
 
+.excelat,
 .excelat-container {
   display: flex;
   flex-direction: column;
@@ -28,11 +29,29 @@
   border: 1px solid var(--excelat-gridline);
   border-radius: 4px;
   overflow: hidden;
-  font-family: var(--excelat-font);
+  font-family: inherit;
   font-size: var(--excelat-font-size);
   color: var(--excelat-cell-text);
   user-select: none;
   box-sizing: border-box;
+}
+
+/* Form controls and interactive elements inside Excelat inherit font-family */
+.excelat button,
+.excelat input,
+.excelat select,
+.excelat textarea,
+.excelat table,
+.excelat th,
+.excelat td,
+.excelat-container button,
+.excelat-container input,
+.excelat-container select,
+.excelat-container textarea,
+.excelat-container table,
+.excelat-container th,
+.excelat-container td {
+  font-family: inherit;
 }
 
 /* Formula Bar */
@@ -55,7 +74,7 @@
   background: #ffffff;
   border: 1px solid var(--excelat-gridline);
   border-radius: 3px;
-  font-family: monospace;
+  font-family: inherit;
   color: #1e293b;
   font-size: 11px;
 }
@@ -64,7 +83,7 @@
   color: #94a3b8;
   font-style: italic;
   font-weight: 700;
-  font-family: serif;
+  font-family: inherit;
   user-select: none;
   font-size: 13px;
 }
