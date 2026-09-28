@@ -1,0 +1,16 @@
+{
+  "name": "excelat-monorepo",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm --workspace=apps/demo run dev",
+    "build": "npm --workspace=packages/react run build && npm --workspace=apps/demo run build",
+    "test": "npm --workspace=packages/react run test"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
+}

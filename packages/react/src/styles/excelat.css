@@ -1,0 +1,274 @@
+/* Excelat - Minimal Excel-like Data Grid */
+
+:root {
+  --excelat-primary: #107c41;
+  --excelat-primary-light: rgba(16, 124, 65, 0.08);
+  --excelat-primary-border: #107c41;
+  --excelat-gridline: #e2e8f0;
+  --excelat-header-bg: #f8fafc;
+  --excelat-header-text: #64748b;
+  --excelat-header-selected-bg: #e2f0d9;
+  --excelat-header-selected-text: #0f5132;
+  --excelat-cell-bg: #ffffff;
+  --excelat-cell-text: #1e293b;
+  --excelat-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --excelat-font-size: 13px;
+  --excelat-row-height: 25px;
+  --excelat-col-width: 100px;
+  --excelat-row-header-width: 46px;
+}
+
+.excelat-container {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background-color: #ffffff;
+  border: 1px solid var(--excelat-gridline);
+  border-radius: 4px;
+  overflow: hidden;
+  font-family: var(--excelat-font);
+  font-size: var(--excelat-font-size);
+  color: var(--excelat-cell-text);
+  user-select: none;
+  box-sizing: border-box;
+}
+
+.excelat-grid-viewport {
+  overflow: auto;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  outline: none;
+  background-color: #ffffff;
+}
+
+.excelat-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  width: max-content;
+  background-color: #ffffff;
+}
+
+/* Header Cells */
+.excelat-thead {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background-color: var(--excelat-header-bg);
+}
+
+.excelat-header-row {
+  height: var(--excelat-row-height);
+}
+
+.excelat-header-corner {
+  position: sticky;
+  left: 0;
+  top: 0;
+  z-index: 10;
+  width: var(--excelat-row-header-width);
+  min-width: var(--excelat-row-header-width);
+  max-width: var(--excelat-row-header-width);
+  background-color: var(--excelat-header-bg);
+  border-right: 1px solid var(--excelat-gridline);
+  border-bottom: 1px solid var(--excelat-gridline);
+  padding: 0;
+  cursor: pointer;
+}
+
+.excelat-corner-inner {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.excelat-corner-inner::after {
+  content: "";
+  position: absolute;
+  bottom: 3px;
+  right: 3px;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 0 6px 6px;
+  border-color: transparent transparent #94a3b8 transparent;
+}
+
+.excelat-col-header {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  width: var(--excelat-col-width);
+  min-width: var(--excelat-col-width);
+  max-width: var(--excelat-col-width);
+  height: var(--excelat-row-height);
+  background-color: var(--excelat-header-bg);
+  color: var(--excelat-header-text);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  border-right: 1px solid var(--excelat-gridline);
+  border-bottom: 1px solid var(--excelat-gridline);
+  padding: 0 4px;
+  box-sizing: border-box;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.excelat-row-header {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  width: var(--excelat-row-header-width);
+  min-width: var(--excelat-row-header-width);
+  max-width: var(--excelat-row-header-width);
+  height: var(--excelat-row-height);
+  background-color: var(--excelat-header-bg);
+  color: var(--excelat-header-text);
+  font-size: 11px;
+  font-weight: 500;
+  text-align: center;
+  border-right: 1px solid var(--excelat-gridline);
+  border-bottom: 1px solid var(--excelat-gridline);
+  padding: 0 4px;
+  box-sizing: border-box;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.excelat-header-selected {
+  background-color: var(--excelat-header-selected-bg) !important;
+  color: var(--excelat-header-selected-text) !important;
+  font-weight: 700;
+}
+
+/* Data Rows & Cells */
+.excelat-row {
+  height: var(--excelat-row-height);
+}
+
+.excelat-cell {
+  position: relative;
+  width: var(--excelat-col-width);
+  min-width: var(--excelat-col-width);
+  max-width: var(--excelat-col-width);
+  height: var(--excelat-row-height);
+  padding: 0 6px;
+  border-right: 1px solid var(--excelat-gridline);
+  border-bottom: 1px solid var(--excelat-gridline);
+  background-color: var(--excelat-cell-bg);
+  box-sizing: border-box;
+  vertical-align: middle;
+  cursor: cell;
+}
+
+.excelat-cell-content {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  line-height: var(--excelat-row-height);
+}
+
+.excelat-cell-number .excelat-cell-content {
+  justify-content: flex-end;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.excelat-cell-boolean .excelat-cell-content {
+  justify-content: center;
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #475569;
+}
+
+/* Range Selection Highlight */
+.excelat-cell-selected {
+  background-color: var(--excelat-primary-light);
+}
+
+/* Range outer border edges */
+.excelat-cell.excelat-border-top {
+  border-top: 1.5px solid var(--excelat-primary) !important;
+}
+
+.excelat-cell.excelat-border-bottom {
+  border-bottom: 1.5px solid var(--excelat-primary) !important;
+}
+
+.excelat-cell.excelat-border-left {
+  border-left: 1.5px solid var(--excelat-primary) !important;
+}
+
+.excelat-cell.excelat-border-right {
+  border-right: 1.5px solid var(--excelat-primary) !important;
+}
+
+/* Active Cell (Focus) */
+.excelat-cell.excelat-cell-active {
+  outline: 2px solid var(--excelat-primary);
+  outline-offset: -2px;
+  z-index: 2;
+  background-color: #ffffff;
+}
+
+/* Active Cell Drag Handle */
+.excelat-cell-handle {
+  position: absolute;
+  bottom: -3px;
+  right: -3px;
+  width: 6px;
+  height: 6px;
+  background-color: var(--excelat-primary);
+  border: 1px solid #ffffff;
+  cursor: crosshair;
+  z-index: 3;
+}
+
+/* Inline Cell Editor */
+.excelat-cell-editor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0 5px;
+  border: 2px solid var(--excelat-primary);
+  border-radius: 0;
+  outline: none;
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--excelat-cell-text);
+  background-color: #ffffff;
+  box-sizing: border-box;
+  z-index: 6;
+}
+
+/* Custom subtle scrollbars for viewport */
+.excelat-grid-viewport::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.excelat-grid-viewport::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.excelat-grid-viewport::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+  border: 2px solid #f1f5f9;
+}
+
+.excelat-grid-viewport::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
