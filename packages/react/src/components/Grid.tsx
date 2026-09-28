@@ -5,6 +5,7 @@ import { RowHeader } from "./RowHeader";
 import { Cell } from "./Cell";
 import { EditMovement } from "../hooks/useEditing";
 import { getCellValue, isCellInRange } from "../model/dataModel";
+import { VirtualizationState } from "../hooks/useVirtualization";
 
 export interface GridProps {
   totalRows: number;
@@ -26,6 +27,8 @@ export interface GridProps {
   editValue: string;
   fillTargetRange?: CellRange | null;
   moveTargetRange?: CellRange | null;
+  virtualization?: VirtualizationState;
+  rowOffset?: number;
   onMouseDownCell: (e: React.MouseEvent, row: number, col: number) => void;
   onMouseEnterCell: (row: number, col: number) => void;
   onDoubleClickCell: (row: number, col: number) => void;
@@ -65,6 +68,8 @@ export const Grid: React.FC<GridProps> = ({
   editValue,
   fillTargetRange,
   moveTargetRange,
+  virtualization,
+  rowOffset = 0,
   onMouseDownCell,
   onMouseEnterCell,
   onDoubleClickCell,
@@ -83,12 +88,33 @@ export const Grid: React.FC<GridProps> = ({
   onStartResizeRow,
   gridRef,
 }) => {
-  const rowIndices = Array.from({ length: totalRows }, (_, i) => i);
-  const colIndices = Array.from({ length: totalCols }, (_, i) => i);
+  const isVirtual = virtualization?.isVirtual;
+  const rowStart = isVirtual ? virtualization.visibleStartRow : 0;
+  const rowEnd = isVirtual ? virtualization.visibleEndRow : totalRows - 1;
+  const rowIndices = Array.from(
+    { length: Math.max(0, rowEnd - rowStart + 1) },
+    (_, i) => rowStart + i
+  );
+
+  const isVirtualCols = isVirtual && virtualization.isVirtualCols;
+  const colStart = isVirtualCols ? virtualization.visibleStartCol : 0;
+  const colEnd = isVirtualCols ? virtualization.visibleEndCol : totalCols - 1;
+  const colIndices = isVirtualCols
+    ? Array.from(
+        { length: Math.max(0, colEnd - colStart + 1) },
+        (_, i) => colStart + i
+      )
+    : Array.from({ length: totalCols }, (_, i) => i);
 
   const shouldRenderThead =
     showColumnLetters ||
     (columns !== undefined && columns.some((c) => c?.header !== undefined));
+
+  const totalColsSpan =
+    colIndices.length +
+    (showRowNumbers ? 1 : 0) +
+    (virtualization?.leftSpacerWidth ? 1 : 0) +
+    (virtualization?.rightSpacerWidth ? 1 : 0);
 
   return (
     <div
@@ -110,6 +136,9 @@ export const Grid: React.FC<GridProps> = ({
               showRowNumbers={showRowNumbers}
               columnWidths={columnWidths}
               defaultColWidth={defaultColWidth}
+              visibleColIndices={isVirtualCols ? colIndices : undefined}
+              leftSpacerWidth={virtualization?.leftSpacerWidth}
+              rightSpacerWidth={virtualization?.rightSpacerWidth}
               isColumnSelected={(c) =>
                 c >= selectionRange.startColumn && c <= selectionRange.endColumn
               }
@@ -121,6 +150,23 @@ export const Grid: React.FC<GridProps> = ({
           </thead>
         )}
         <tbody className="excelat-tbody">
+          {isVirtual && virtualization.topSpacerHeight > 0 && (
+            <tr
+              className="excelat-row-spacer"
+              style={{ height: `${virtualization.topSpacerHeight}px` }}
+              aria-hidden="true"
+            >
+              <td
+                colSpan={totalColsSpan}
+                style={{
+                  height: `${virtualization.topSpacerHeight}px`,
+                  padding: 0,
+                  border: 0,
+                }}
+              />
+            </tr>
+          )}
+
           {rowIndices.map((row) => {
             const isRowSelected =
               row >= selectionRange.startRow && row <= selectionRange.endRow;
@@ -135,11 +181,23 @@ export const Grid: React.FC<GridProps> = ({
               >
                 {showRowNumbers && (
                   <RowHeader
-                    rowIndex={row}
+                    rowIndex={row + rowOffset}
                     height={rowHeight}
                     isSelected={isRowSelected}
-                    onSelectRow={onSelectRow}
-                    onStartResizeRow={onStartResizeRow}
+                    onSelectRow={() => onSelectRow(row)}
+                    onStartResizeRow={(e) => onStartResizeRow?.(e, row)}
+                  />
+                )}
+                {isVirtualCols && virtualization.leftSpacerWidth > 0 && (
+                  <td
+                    style={{
+                      width: `${virtualization.leftSpacerWidth}px`,
+                      minWidth: `${virtualization.leftSpacerWidth}px`,
+                      maxWidth: `${virtualization.leftSpacerWidth}px`,
+                      padding: 0,
+                      border: 0,
+                    }}
+                    aria-hidden="true"
                   />
                 )}
                 {colIndices.map((col) => {
@@ -205,9 +263,38 @@ export const Grid: React.FC<GridProps> = ({
                     />
                   );
                 })}
+                {isVirtualCols && virtualization.rightSpacerWidth > 0 && (
+                  <td
+                    style={{
+                      width: `${virtualization.rightSpacerWidth}px`,
+                      minWidth: `${virtualization.rightSpacerWidth}px`,
+                      maxWidth: `${virtualization.rightSpacerWidth}px`,
+                      padding: 0,
+                      border: 0,
+                    }}
+                    aria-hidden="true"
+                  />
+                )}
               </tr>
             );
           })}
+
+          {isVirtual && virtualization.bottomSpacerHeight > 0 && (
+            <tr
+              className="excelat-row-spacer"
+              style={{ height: `${virtualization.bottomSpacerHeight}px` }}
+              aria-hidden="true"
+            >
+              <td
+                colSpan={totalColsSpan}
+                style={{
+                  height: `${virtualization.bottomSpacerHeight}px`,
+                  padding: 0,
+                  border: 0,
+                }}
+              />
+            </tr>
+          )}
         </tbody>
       </table>
     </div>

@@ -43,10 +43,87 @@ export interface ContextMenuContext {
   selection: CellRange;
 }
 
+export type ExcelatOperation =
+  | {
+      type: "cell.update";
+      row: number;
+      column: number;
+      value: CellValue;
+      previousValue?: CellValue;
+    }
+  | {
+      type: "range.update";
+      range: CellRange;
+      values: CellValue[][];
+      previousValues?: CellValue[][];
+    }
+  | {
+      type: "range.clear";
+      range: CellRange;
+      previousValues?: CellValue[][];
+    }
+  | {
+      type: "range.paste";
+      range: CellRange;
+      values: CellValue[][];
+      previousValues?: CellValue[][];
+    }
+  | {
+      type: "range.cut";
+      source: CellRange;
+      destination: CellRange;
+      values?: CellValue[][];
+    }
+  | {
+      type: "range.fill";
+      source: CellRange;
+      destination: CellRange;
+      values: CellValue[][];
+    }
+  | {
+      type: "range.move";
+      source: CellRange;
+      destination: CellRange;
+      values: CellValue[][];
+    }
+  | {
+      type: "row.insert";
+      index: number;
+      values?: CellValue[];
+    }
+  | {
+      type: "row.delete";
+      index: number;
+      deletedRow?: CellValue[];
+    }
+  | {
+      type: "column.insert";
+      index: number;
+    }
+  | {
+      type: "column.delete";
+      index: number;
+    }
+  | {
+      type: "batch";
+      operations: ExcelatOperation[];
+    };
+
+export interface PaginationConfig {
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
+export interface VirtualizationConfig {
+  rowOverscan?: number;
+  colOverscan?: number;
+}
+
 export interface ExcelatRef {
-  insertRow: (index?: number) => void;
+  insertRow: (index?: number, values?: CellValue[]) => void;
   deleteRow: (index?: number) => void;
-  insertColumn: (index?: number) => void;
+  insertColumn: (index?: number, values?: CellValue[]) => void;
   deleteColumn: (index?: number) => void;
   undo: () => void;
   redo: () => void;
@@ -100,6 +177,37 @@ export interface ExcelatProps {
    */
   showFormulaBar?: boolean;
   /**
+   * Enable virtualization for large datasets.
+   * Can be boolean or configuration with overscans.
+   * @default false
+   */
+  virtualization?: boolean | VirtualizationConfig;
+  /**
+   * Controlled server-side pagination configuration.
+   */
+  pagination?: PaginationConfig;
+  /**
+   * Callback fired when page changes in pagination mode.
+   */
+  onPageChange?: (page: number) => void;
+  /**
+   * Whether more data is available for infinite / incremental loading.
+   */
+  hasMore?: boolean;
+  /**
+   * Whether data is currently loading (for server-side loading or pagination).
+   */
+  loading?: boolean;
+  /**
+   * Callback fired when user scrolls near the end of loaded data.
+   */
+  onLoadMore?: () => void;
+  /**
+   * Callback fired whenever a grid mutation / operation occurs.
+   * Enables clean developer-controlled persistence.
+   */
+  onOperation?: (operation: ExcelatOperation) => void;
+  /**
    * Callback fired when data changes (via edit, paste, delete, undo, redo, structural operations).
    */
   onChange?: (nextData: ExcelatData) => void;
@@ -132,3 +240,4 @@ export interface ExcelatProps {
    */
   readOnly?: boolean;
 }
+

@@ -13,6 +13,9 @@ export type {
   CellRenderContext,
   ContextMenuContext,
   ExcelatRef,
+  ExcelatOperation,
+  PaginationConfig,
+  VirtualizationConfig,
 } from "./model/types";
 export type {
   GridOperation,
@@ -24,6 +27,7 @@ export type {
   ColumnInsertOp,
   ColumnDeleteOp,
   RangeMoveOp,
+  BatchOp,
 } from "./model/operations";
 export {
   applyOperation,
@@ -47,5 +51,9 @@ export { ColumnHeader } from "./components/ColumnHeader";
 export { RowHeader } from "./components/RowHeader";
 export { CellEditor } from "./components/CellEditor";
 export { FormulaBar } from "./components/FormulaBar";
+export { Pagination } from "./components/Pagination";
+export { useVirtualization } from "./hooks/useVirtualization";
+export type { VirtualizationState } from "./hooks/useVirtualization";
 
 export default Excelat;
+

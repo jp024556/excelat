@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { CellCoord, CellRange, ExcelatData } from "../model/types";
+import { CellCoord, CellRange, ExcelatData, ExcelatOperation } from "../model/types";
 import { GridOperation } from "../model/operations";
 import { getRangeValues, serializeToTSV, parseFromTSV } from "../model/dataModel";
 
@@ -7,7 +7,7 @@ export function useClipboard(
   getData: () => ExcelatData,
   getSelectionRange: () => CellRange,
   getActiveCell: () => CellCoord,
-  executeOperation: (op: GridOperation) => void,
+  executeOperation: (op: GridOperation, publicOp?: ExcelatOperation) => void,
   setRange: (startRow: number, startColumn: number, endRow: number, endColumn: number) => void,
   readOnly?: boolean
 ) {
@@ -34,11 +34,19 @@ export function useClipboard(
     const range = getSelectionRange();
     const previousValues = getRangeValues(data, range);
 
-    executeOperation({
-      type: "range.clear",
-      range,
-      previousValues,
-    });
+    executeOperation(
+      {
+        type: "range.clear",
+        range,
+        previousValues,
+      },
+      {
+        type: "range.cut",
+        source: range,
+        destination: range,
+        values: previousValues,
+      }
+    );
 
     return tsv;
   }, [copy, getData, getSelectionRange, executeOperation, readOnly]);
@@ -76,12 +84,20 @@ export function useClipboard(
       const data = getData();
       const previousValues = getRangeValues(data, targetRange);
 
-      executeOperation({
-        type: "range.update",
-        range: targetRange,
-        previousValues,
-        values: matrix,
-      });
+      executeOperation(
+        {
+          type: "range.update",
+          range: targetRange,
+          previousValues,
+          values: matrix,
+        },
+        {
+          type: "range.paste",
+          range: targetRange,
+          values: matrix,
+          previousValues,
+        }
+      );
 
       // Update selection to match pasted range
       setRange(

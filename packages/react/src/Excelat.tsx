@@ -15,14 +15,17 @@ import {
   CellCoord,
   CellRange,
   CellValue,
+  ExcelatOperation,
 } from "./model/types";
 import { Grid } from "./components/Grid";
 import { FormulaBar } from "./components/FormulaBar";
+import { Pagination } from "./components/Pagination";
 import { useSelection } from "./hooks/useSelection";
 import { useHistory } from "./hooks/useHistory";
 import { useEditing, EditMovement } from "./hooks/useEditing";
 import { useClipboard } from "./hooks/useClipboard";
 import { useKeyboard } from "./hooks/useKeyboard";
+import { useVirtualization } from "./hooks/useVirtualization";
 import {
   getCellValue,
   getColumnLabel,
@@ -50,6 +53,13 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
       showRowNumbers: propShowRowNumbers,
       showColumnLetters: propShowColumnLetters,
       showFormulaBar = false,
+      virtualization,
+      pagination,
+      onPageChange,
+      hasMore,
+      loading = false,
+      onLoadMore,
+      onOperation,
       onChange,
       onSelectionChange,
       onColumnResize,
@@ -140,7 +150,28 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
     );
 
     // History / Operations
-    const { executeOperation, undo, redo } = useHistory(setData);
+    const { executeOperation, undo, redo } = useHistory(setData, onOperation);
+
+    // Row offset for pagination
+    const rowOffset = pagination
+      ? Math.max(0, (pagination.page - 1) * pagination.pageSize)
+      : 0;
+
+    // Virtualization
+    const virtualizationState = useVirtualization({
+      enabled: virtualization,
+      totalRows,
+      totalCols,
+      rowHeights,
+      defaultRowHeight: 25,
+      columnWidths,
+      defaultColWidth: 100,
+      columns: columnDefs,
+      viewportRef: gridRef,
+      hasMore,
+      loading,
+      onLoadMore,
+    });
 
     // Selection
     const {
@@ -160,45 +191,53 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
     }, []);
 
     // Auto-scroll active cell into view inside the viewport on navigation
+    // Computes target position mathematically so virtualization doesn't break scrolling
     useEffect(() => {
       const viewport = gridRef.current;
       if (!viewport) return;
 
-      const activeTd = viewport.querySelector(
-        `td[data-row="${anchor.row}"][data-col="${anchor.col}"]`
-      ) as HTMLElement | null;
-
-      if (activeTd) {
-        const thead = viewport.querySelector(".excelat-thead") as HTMLElement | null;
-        const theadHeight = thead ? thead.offsetHeight : 0;
-        const rowHeader = activeTd.parentElement?.querySelector(
-          ".excelat-row-header"
-        ) as HTMLElement | null;
-        const rowHeaderWidth = rowHeader ? rowHeader.offsetWidth : 0;
-
-        const cellTop = activeTd.offsetTop;
-        const cellBottom = cellTop + activeTd.offsetHeight;
-        const cellLeft = activeTd.offsetLeft;
-        const cellRight = cellLeft + activeTd.offsetWidth;
-
-        const viewTop = viewport.scrollTop + theadHeight;
-        const viewBottom = viewport.scrollTop + viewport.clientHeight;
-        const viewLeft = viewport.scrollLeft + rowHeaderWidth;
-        const viewRight = viewport.scrollLeft + viewport.clientWidth;
-
-        if (cellTop < viewTop) {
-          viewport.scrollTop = cellTop - theadHeight;
-        } else if (cellBottom > viewBottom) {
-          viewport.scrollTop = cellBottom - viewport.clientHeight;
-        }
-
-        if (cellLeft < viewLeft) {
-          viewport.scrollLeft = cellLeft - rowHeaderWidth;
-        } else if (cellRight > viewRight) {
-          viewport.scrollLeft = cellRight - viewport.clientWidth;
-        }
+      let cellTop = 0;
+      for (let r = 0; r < anchor.row; r++) {
+        cellTop += rowHeights[r] ?? 25;
       }
-    }, [anchor]);
+      const cellHeight = rowHeights[anchor.row] ?? 25;
+      const cellBottom = cellTop + cellHeight;
+
+      let cellLeft = 0;
+      for (let c = 0; c < anchor.col; c++) {
+        cellLeft += columnWidths[c] ?? columnDefs?.[c]?.width ?? 100;
+      }
+      const cellWidth =
+        columnWidths[anchor.col] ?? columnDefs?.[anchor.col]?.width ?? 100;
+      const cellRight = cellLeft + cellWidth;
+
+      const thead = viewport.querySelector(".excelat-thead") as HTMLElement | null;
+      const theadHeight = thead ? thead.offsetHeight : 0;
+      const rowHeader = viewport.querySelector(".excelat-row-header") as HTMLElement | null;
+      const rowHeaderWidth =
+        showRowNumbers && rowHeader
+          ? rowHeader.offsetWidth
+          : showRowNumbers
+          ? 40
+          : 0;
+
+      const viewTop = viewport.scrollTop;
+      const viewBottom = viewport.scrollTop + viewport.clientHeight - theadHeight;
+      const viewLeft = viewport.scrollLeft;
+      const viewRight = viewport.scrollLeft + viewport.clientWidth - rowHeaderWidth;
+
+      if (cellTop < viewTop) {
+        viewport.scrollTop = cellTop;
+      } else if (cellBottom > viewBottom) {
+        viewport.scrollTop = cellBottom - viewport.clientHeight + theadHeight;
+      }
+
+      if (cellLeft < viewLeft) {
+        viewport.scrollLeft = cellLeft;
+      } else if (cellRight > viewRight) {
+        viewport.scrollLeft = cellRight - viewport.clientWidth + rowHeaderWidth;
+      }
+    }, [anchor, rowHeights, columnWidths, columnDefs, showRowNumbers]);
 
     // Post-edit navigation handler
     const handleNavigateAfterCommit = useCallback(
@@ -278,16 +317,26 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
 
     // Structural Row & Column Operations
     const insertRow = useCallback(
-      (index?: number) => {
+      (index?: number, values?: CellValue[]) => {
         if (readOnly) return;
         const targetRow = index !== undefined ? index : anchor.row;
-        const newRow = new Array(totalCols).fill(null);
+        const rowToInsert =
+          values && values.length > 0
+            ? Array.from({ length: totalCols }, (_, c) =>
+                c < values.length ? values[c] : null
+              )
+            : new Array(totalCols).fill(null);
         const op: RowInsertOp = {
           type: "row.insert",
           rowIndex: targetRow,
-          rows: [newRow],
+          rows: [rowToInsert],
         };
-        executeOperation(op);
+        const publicOp: ExcelatOperation = {
+          type: "row.insert",
+          index: targetRow,
+          values: values ?? undefined,
+        };
+        executeOperation(op, publicOp);
       },
       [readOnly, anchor.row, totalCols, executeOperation]
     );
@@ -304,23 +353,33 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
           rowIndex: targetRow,
           deletedRows: [deletedRow],
         };
-        executeOperation(op);
+        const publicOp: ExcelatOperation = {
+          type: "row.delete",
+          index: targetRow,
+        };
+        executeOperation(op, publicOp);
         selectCell(Math.max(0, targetRow - 1), anchor.col);
       },
       [readOnly, currentData, anchor.row, anchor.col, executeOperation, selectCell]
     );
 
     const insertColumn = useCallback(
-      (index?: number) => {
+      (index?: number, values?: CellValue[]) => {
         if (readOnly) return;
         const targetCol = index !== undefined ? index : anchor.col;
-        const columnsData = currentData.map(() => [null]);
+        const columnsData = currentData.map((_, r) => [
+          values && r < values.length ? values[r] : null,
+        ]);
         const op: ColumnInsertOp = {
           type: "column.insert",
           columnIndex: targetCol,
           columnsData,
         };
-        executeOperation(op);
+        const publicOp: ExcelatOperation = {
+          type: "column.insert",
+          index: targetCol,
+        };
+        executeOperation(op, publicOp);
       },
       [readOnly, anchor.col, currentData, executeOperation]
     );
@@ -337,7 +396,11 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
           columnIndex: targetCol,
           deletedColumnsData,
         };
-        executeOperation(op);
+        const publicOp: ExcelatOperation = {
+          type: "column.delete",
+          index: targetCol,
+        };
+        executeOperation(op, publicOp);
         selectCell(anchor.row, Math.max(0, targetCol - 1));
       },
       [readOnly, totalCols, anchor.row, anchor.col, currentData, executeOperation, selectCell]
@@ -557,7 +620,12 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
               previousValues,
               values: filledValues,
             };
-            executeOperation(op);
+            executeOperation(op, {
+              type: "range.fill",
+              source: range,
+              destination: fillTargetRange,
+              values: filledValues,
+            });
             setRange(
               fillTargetRange.startRow,
               fillTargetRange.startColumn,
@@ -585,7 +653,12 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
               movedValues,
               overwrittenValues,
             };
-            executeOperation(op);
+            executeOperation(op, {
+              type: "range.move",
+              source: range,
+              destination: moveTargetRange,
+              values: movedValues,
+            });
             setRange(
               moveTargetRange.startRow,
               moveTargetRange.startColumn,
@@ -766,6 +839,8 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
           editValue={editValue}
           fillTargetRange={fillTargetRange}
           moveTargetRange={moveTargetRange}
+          virtualization={virtualizationState}
+          rowOffset={rowOffset}
           onMouseDownCell={handleMouseDownCell}
           onMouseEnterCell={handleMouseEnterCell}
           onDoubleClickCell={handleDoubleClickCell}
@@ -786,6 +861,18 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
           onAutoFitCol={handleAutoFitCol}
           onStartResizeRow={handleStartResizeRow}
         />
+        {loading && (
+          <div className="excelat-loading-banner" role="status" aria-live="polite">
+            <span className="excelat-spinner" /> Loading...
+          </div>
+        )}
+        {pagination && (
+          <Pagination
+            config={pagination}
+            onPageChange={onPageChange}
+            loading={loading}
+          />
+        )}
       </div>
     );
   }

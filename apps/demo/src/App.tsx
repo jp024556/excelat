@@ -7,6 +7,7 @@ import {
   SelectionStyle,
   ExcelatColumn,
   ExcelatRef,
+  ExcelatOperation,
   getColumnLabel,
   getRowLabel,
 } from "@excelat/react";
@@ -24,8 +25,14 @@ import {
   Redo2,
   Plus,
   Trash2,
+  Zap,
+  Layers,
+  Database,
+  Terminal,
 } from "lucide-react";
 import "./App.css";
+
+type DemoScenario = "standard" | "virtualization" | "pagination" | "infinite";
 
 const INITIAL_DATA: ExcelatData = [
   ["Jay", 30, "Bangalore", 2200000, "Active", "Engineering"],
@@ -46,8 +53,25 @@ const TABLE_COLUMNS: ExcelatColumn[] = [
   { header: "Department", width: 150, type: "text" },
 ];
 
+// Generate 10,000 rows for virtualization demonstration
+function generateVirtualData(count = 10000): ExcelatData {
+  const cities = ["Bangalore", "Delhi", "Mumbai", "Pune", "Hyderabad", "Chennai", "Seattle", "Austin"];
+  const depts = ["Engineering", "Product", "Design", "Analytics", "Operations", "Sales"];
+  const names = ["Alex", "Jordan", "Taylor", "Morgan", "Sam", "Chris", "Pat", "Riley", "Casey", "Avery"];
+
+  return Array.from({ length: count }, (_, i) => [
+    `${names[i % names.length]} #${i + 1}`,
+    22 + (i % 40),
+    cities[i % cities.length],
+    1200000 + ((i * 17000) % 2500000),
+    i % 5 === 0 ? "Inactive" : "Active",
+    depts[i % depts.length],
+  ]);
+}
+
 export function App() {
   const gridRef = useRef<ExcelatRef>(null);
+  const [scenario, setScenario] = useState<DemoScenario>("standard");
   const [data, setData] = useState<ExcelatData>(INITIAL_DATA);
   const [mode, setMode] = useState<ExcelatMode>("spreadsheet");
   const [selectionStyle, setSelectionStyle] = useState<SelectionStyle>("excel");
@@ -67,6 +91,79 @@ export function App() {
     rowIndex: number;
     columnIndex: number;
   } | null>(null);
+
+  // Pagination Scenario State
+  const [page, setPage] = useState<number>(1);
+  const [isPageLoading, setIsPageLoading] = useState<boolean>(false);
+  const pageSize = 25;
+  const totalItems = 500;
+
+  // Infinite Scenario State
+  const [infiniteRows, setInfiniteRows] = useState<ExcelatData>(() =>
+    generateVirtualData(60)
+  );
+  const [isInfiniteLoading, setIsInfiniteLoading] = useState<boolean>(false);
+  const [hasMore, setHasMore] = useState<boolean>(true);
+
+  // Operation event logs for developers
+  const [operationLogs, setOperationLogs] = useState<
+    Array<{ id: number; time: string; op: ExcelatOperation }>
+  >([]);
+
+  // 10,000 row virtualized dataset
+  const virtualData = useMemo(() => generateVirtualData(10000), []);
+
+  // Simulated server-side page data
+  const pageData = useMemo(() => {
+    const offset = (page - 1) * pageSize;
+    return Array.from({ length: pageSize }, (_, i) => {
+      const idx = offset + i;
+      return [
+        `Record #${idx + 1}`,
+        20 + (idx % 45),
+        idx % 2 === 0 ? "Server Node A" : "Server Node B",
+        50000 + idx * 120,
+        idx % 7 === 0 ? "Pending" : "Confirmed",
+        idx % 3 === 0 ? "Finance" : "Technology",
+      ];
+    });
+  }, [page]);
+
+  // Handle server-side page change simulation
+  const handlePageChange = useCallback((nextPage: number) => {
+    setIsPageLoading(true);
+    // Simulate brief network latency (150ms)
+    setTimeout(() => {
+      setPage(nextPage);
+      setIsPageLoading(false);
+    }, 150);
+  }, []);
+
+  // Handle infinite scroll load more simulation
+  const handleLoadMore = useCallback(() => {
+    if (isInfiniteLoading || !hasMore) return;
+    setIsInfiniteLoading(true);
+
+    setTimeout(() => {
+      setInfiniteRows((prev) => {
+        const nextBatch = generateVirtualData(prev.length + 30).slice(prev.length);
+        if (prev.length + nextBatch.length >= 300) {
+          setHasMore(false);
+        }
+        return [...prev, ...nextBatch];
+      });
+      setIsInfiniteLoading(false);
+    }, 350);
+  }, [isInfiniteLoading, hasMore]);
+
+  // Log operations from Excelat
+  const handleOperation = useCallback((op: ExcelatOperation) => {
+    const timestamp = new Date().toLocaleTimeString();
+    setOperationLogs((prev) => [
+      { id: Date.now() + Math.random(), time: timestamp, op },
+      ...prev.slice(0, 24),
+    ]);
+  }, []);
 
   // Close context menu on outside click
   useEffect(() => {
@@ -93,9 +190,22 @@ export function App() {
 
   const handleReset = useCallback(() => {
     setData(INITIAL_DATA);
+    setPage(1);
+    setInfiniteRows(generateVirtualData(60));
+    setHasMore(true);
+    setOperationLogs([]);
   }, []);
 
   // Compute selection stats
+  const activeDataset =
+    scenario === "virtualization"
+      ? virtualData
+      : scenario === "pagination"
+      ? pageData
+      : scenario === "infinite"
+      ? infiniteRows
+      : data;
+
   const stats = useMemo(() => {
     let count = 0;
     let numericCount = 0;
@@ -104,7 +214,7 @@ export function App() {
     for (let r = selection.startRow; r <= selection.endRow; r++) {
       for (let c = selection.startColumn; c <= selection.endColumn; c++) {
         count++;
-        const val = data[r]?.[c];
+        const val = activeDataset[r]?.[c];
         if (typeof val === "number") {
           sum += val;
           numericCount++;
@@ -114,7 +224,7 @@ export function App() {
 
     const average = numericCount > 0 ? (sum / numericCount).toFixed(1) : null;
     return { count, numericCount, sum, average };
-  }, [selection, data]);
+  }, [selection, activeDataset]);
 
   const activeCoordText = `${getColumnLabel(selection.startColumn)}${getRowLabel(selection.startRow)}`;
   const rangeCoordText =
@@ -124,11 +234,20 @@ export function App() {
       : `${activeCoordText}:${getColumnLabel(selection.endColumn)}${getRowLabel(selection.endRow)}`;
 
   const handleCopyCode = () => {
-    navigator.clipboard.writeText(
-      mode === "table"
-        ? `<Excelat\n  data={data}\n  mode="table"\n  columns={[\n    { header: "Name", type: "text" },\n    { header: "Age", type: "number" },\n    { header: "City", type: "text" },\n    {\n      header: "Status",\n      render: ({ value }) => <StatusBadge active={value} />\n    }\n  ]}\n/>`
-        : `<Excelat\n  data={data}\n  rows={50}\n  columns={16}\n  showFormulaBar={true}\n/>`
-    );
+    let snippet = "";
+    if (scenario === "virtualization") {
+      snippet = `<Excelat\n  data={largeDataset} // 10,000+ rows\n  virtualization\n  columns={columns}\n/>`;
+    } else if (scenario === "pagination") {
+      snippet = `<Excelat\n  data={currentPageRows}\n  pagination={{\n    page: ${page},\n    pageSize: ${pageSize},\n    total: ${totalItems}\n  }}\n  onPageChange={handlePageChange}\n/>`;
+    } else if (scenario === "infinite") {
+      snippet = `<Excelat\n  data={rows}\n  virtualization\n  hasMore={hasMore}\n  loading={loading}\n  onLoadMore={loadMore}\n/>`;
+    } else if (mode === "table") {
+      snippet = `<Excelat\n  data={data}\n  mode="table"\n  columns={TABLE_COLUMNS}\n  onOperation={handleOperation}\n/>`;
+    } else {
+      snippet = `<Excelat\n  data={data}\n  rows={50}\n  columns={16}\n  showFormulaBar={true}\n  onOperation={handleOperation}\n/>`;
+    }
+
+    navigator.clipboard.writeText(snippet);
     setCopiedNotification(true);
     setTimeout(() => setCopiedNotification(false), 2000);
   };
@@ -144,10 +263,10 @@ export function App() {
           <div>
             <div className="demo-title-row">
               <h1 className="demo-title">Excelat</h1>
-              <span className="demo-badge">V0.1</span>
+              <span className="demo-badge">V0.2</span>
             </div>
             <p className="demo-subtitle">
-              Excel-like interaction underneath, normal table appearance when you want it.
+              Excel-like spreadsheet tables for React with first-class Virtualization, Controlled Pagination & Developer Operation Events.
             </p>
           </div>
         </div>
@@ -159,10 +278,42 @@ export function App() {
           </button>
           <button className="demo-btn demo-btn-primary" onClick={handleReset}>
             <RotateCcw size={14} />
-            <span>Reset Data</span>
+            <span>Reset Demo</span>
           </button>
         </div>
       </header>
+
+      {/* Scenario Switcher Tabs */}
+      <nav className="demo-scenario-tabs" aria-label="Feature Scenarios">
+        <button
+          className={`scenario-tab ${scenario === "standard" ? "active" : ""}`}
+          onClick={() => setScenario("standard")}
+        >
+          <Sheet size={15} />
+          <span>Local Data</span>
+        </button>
+        <button
+          className={`scenario-tab ${scenario === "virtualization" ? "active" : ""}`}
+          onClick={() => setScenario("virtualization")}
+        >
+          <Zap size={15} />
+          <span>Virtualization (10,000 Rows)</span>
+        </button>
+        <button
+          className={`scenario-tab ${scenario === "pagination" ? "active" : ""}`}
+          onClick={() => setScenario("pagination")}
+        >
+          <Layers size={15} />
+          <span>Controlled Pagination</span>
+        </button>
+        <button
+          className={`scenario-tab ${scenario === "infinite" ? "active" : ""}`}
+          onClick={() => setScenario("infinite")}
+        >
+          <Database size={15} />
+          <span>Infinite Loading</span>
+        </button>
+      </nav>
 
       {/* Control Panel: Visual Modes, Selection Styles & Header Options */}
       <section className="demo-control-panel">
@@ -300,28 +451,88 @@ export function App() {
       <main className="demo-main">
         <div className="demo-grid-card">
           <div className="demo-spreadsheet-container">
-            <Excelat
-              ref={gridRef}
-              data={data}
-              mode={mode}
-              columns={mode === "table" ? TABLE_COLUMNS : 15}
-              rows={mode === "table" ? 25 : 35}
-              selectionStyle={selectionStyle}
-              showRowNumbers={showRowNumbers}
-              showColumnLetters={showColumnLetters}
-              showFormulaBar={showFormulaBar}
-              onChange={setData}
-              onSelectionChange={setSelection}
-              onContextMenu={(e, ctx) => {
-                e.preventDefault();
-                setContextMenu({
-                  x: e.clientX,
-                  y: e.clientY,
-                  rowIndex: ctx.rowIndex,
-                  columnIndex: ctx.columnIndex,
-                });
-              }}
-            />
+            {scenario === "standard" && (
+              <Excelat
+                ref={gridRef}
+                data={data}
+                mode={mode}
+                columns={mode === "table" ? TABLE_COLUMNS : 15}
+                rows={mode === "table" ? 25 : 35}
+                selectionStyle={selectionStyle}
+                showRowNumbers={showRowNumbers}
+                showColumnLetters={showColumnLetters}
+                showFormulaBar={showFormulaBar}
+                onChange={setData}
+                onSelectionChange={setSelection}
+                onOperation={handleOperation}
+                onContextMenu={(e, ctx) => {
+                  e.preventDefault();
+                  setContextMenu({
+                    x: e.clientX,
+                    y: e.clientY,
+                    rowIndex: ctx.rowIndex,
+                    columnIndex: ctx.columnIndex,
+                  });
+                }}
+              />
+            )}
+
+            {scenario === "virtualization" && (
+              <Excelat
+                ref={gridRef}
+                data={virtualData}
+                virtualization
+                mode={mode}
+                columns={TABLE_COLUMNS}
+                selectionStyle={selectionStyle}
+                showRowNumbers={showRowNumbers}
+                showColumnLetters={showColumnLetters}
+                showFormulaBar={showFormulaBar}
+                onSelectionChange={setSelection}
+                onOperation={handleOperation}
+              />
+            )}
+
+            {scenario === "pagination" && (
+              <Excelat
+                ref={gridRef}
+                data={pageData}
+                pagination={{
+                  page,
+                  pageSize,
+                  total: totalItems,
+                }}
+                loading={isPageLoading}
+                onPageChange={handlePageChange}
+                mode={mode}
+                columns={TABLE_COLUMNS}
+                selectionStyle={selectionStyle}
+                showRowNumbers={showRowNumbers}
+                showColumnLetters={showColumnLetters}
+                showFormulaBar={showFormulaBar}
+                onSelectionChange={setSelection}
+                onOperation={handleOperation}
+              />
+            )}
+
+            {scenario === "infinite" && (
+              <Excelat
+                ref={gridRef}
+                data={infiniteRows}
+                virtualization
+                hasMore={hasMore}
+                loading={isInfiniteLoading}
+                onLoadMore={handleLoadMore}
+                mode={mode}
+                columns={TABLE_COLUMNS}
+                selectionStyle={selectionStyle}
+                showRowNumbers={showRowNumbers}
+                showColumnLetters={showColumnLetters}
+                showFormulaBar={showFormulaBar}
+                onSelectionChange={setSelection}
+                onOperation={handleOperation}
+              />
+            )}
           </div>
 
           {/* Context Menu */}
@@ -406,7 +617,17 @@ export function App() {
           <div className="demo-status-bar">
             <div className="status-left">
               <span className="status-indicator" />
-              <span>{mode === "table" ? "Table Mode Active" : "Spreadsheet Mode Active"}</span>
+              <span>
+                {scenario === "virtualization"
+                  ? "10,000 Rows Virtualized (60 FPS)"
+                  : scenario === "pagination"
+                  ? `Server-Side Pagination (Page ${page})`
+                  : scenario === "infinite"
+                  ? `Infinite Loading (${infiniteRows.length} Loaded)`
+                  : mode === "table"
+                  ? "Table Mode Active"
+                  : "Spreadsheet Mode Active"}
+              </span>
               <span className="status-sep">|</span>
               <span className="status-range">{rangeCoordText}</span>
               <span className="status-count">
@@ -415,7 +636,7 @@ export function App() {
               <span className="status-sep">|</span>
               <span className="status-hint">
                 <MoveHorizontal size={13} style={{ verticalAlign: "middle", marginRight: "3px" }} />
-                Drag header edge to resize columns
+                Drag header edge to resize
               </span>
             </div>
             <div className="status-right">
@@ -426,7 +647,7 @@ export function App() {
                   </span>
                   <span className="status-sep">|</span>
                   <span className="status-stat">
-                    Average: <strong>{stats.average}</strong>
+                    Avg: <strong>{stats.average}</strong>
                   </span>
                   <span className="status-sep">|</span>
                   <span className="status-stat">
@@ -438,12 +659,48 @@ export function App() {
           </div>
         </div>
 
+        {/* Live Operations & Persistence Stream Logger */}
+        <section className="demo-operations-card">
+          <div className="operations-header">
+            <div className="operations-title">
+              <Terminal size={16} />
+              <span>Live Mutation & Operation Stream (onOperation)</span>
+            </div>
+            <span className="operations-badge">
+              {operationLogs.length} events captured
+            </span>
+          </div>
+          <p className="operations-desc">
+            Excelat never touches backend persistence directly. Every edit, drag-fill, range-move, paste, or structural operation emits a clean, typed <code>ExcelatOperation</code> event that you can immediately send to REST, GraphQL, WebSocket, or Supabase.
+          </p>
+
+          <div className="operations-stream">
+            {operationLogs.length === 0 ? (
+              <div className="operations-empty">
+                Perform any mutation (edit a cell, clear a range, drag fill handle, paste, insert row) to inspect live events...
+              </div>
+            ) : (
+              operationLogs.map((entry) => (
+                <div key={entry.id} className="operation-item">
+                  <div className="operation-item-header">
+                    <span className="operation-type">{entry.op.type}</span>
+                    <span className="operation-time">{entry.time}</span>
+                  </div>
+                  <pre className="operation-json">
+                    {JSON.stringify(entry.op, null, 2)}
+                  </pre>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+
         {/* Keyboard Shortcuts Reference */}
         <section className="demo-shortcuts-section">
           <div className="shortcuts-header">
             <Keyboard size={18} className="shortcuts-icon" />
             <h2>Spreadsheet Navigation & Keyboard Shortcuts</h2>
-            <span className="shortcuts-hint">Full keyboard support works in both Table and Spreadsheet modes</span>
+            <span className="shortcuts-hint">Full keyboard support works seamlessly with Virtualization and Pagination</span>
           </div>
 
           <div className="shortcuts-grid">
@@ -497,29 +754,27 @@ export function App() {
           </div>
           <div className="code-grid">
             <div>
-              <div className="code-subtitle">Table Mode with Column Headers</div>
+              <div className="code-subtitle">1. 10,000+ Rows Virtualization</div>
               <pre className="code-block">
 {`<Excelat
-  data={data}
-  mode="table"
-  columns={[
-    { header: "Name" },
-    { header: "Age" },
-    { header: "City" }
-  ]}
+  data={largeDataset}
+  virtualization
+  mode="spreadsheet"
+  onOperation={handleOperation}
 />`}
               </pre>
             </div>
             <div>
-              <div className="code-subtitle">Classic Spreadsheet Mode</div>
+              <div className="code-subtitle">2. Controlled Server-Side Pagination</div>
               <pre className="code-block">
 {`<Excelat
-  data={data}
-  mode="spreadsheet"
-  rows={100}
-  columns={20}
-  selectionStyle="excel"
-  showFormulaBar={true}
+  data={pageRows}
+  pagination={{
+    page: 1,
+    pageSize: 50,
+    total: 10000
+  }}
+  onPageChange={(next) => fetchPage(next)}
 />`}
               </pre>
             </div>

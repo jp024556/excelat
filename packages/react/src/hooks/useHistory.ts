@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { ExcelatData } from "../model/types";
+import { ExcelatData, ExcelatOperation } from "../model/types";
 import { GridOperation, applyOperation, invertOperation } from "../model/operations";
 
 export interface HistoryState {
@@ -7,8 +7,69 @@ export interface HistoryState {
   redoStack: GridOperation[];
 }
 
+export function mapGridOpToPublicOp(op: GridOperation): ExcelatOperation {
+  switch (op.type) {
+    case "cell.update":
+      return {
+        type: "cell.update",
+        row: op.row,
+        column: op.column,
+        value: op.value,
+        previousValue: op.previousValue,
+      };
+    case "range.clear":
+      return {
+        type: "range.clear",
+        range: op.range,
+        previousValues: op.previousValues,
+      };
+    case "range.update":
+      return {
+        type: "range.update",
+        range: op.range,
+        values: op.values,
+        previousValues: op.previousValues,
+      };
+    case "row.insert":
+      return {
+        type: "row.insert",
+        index: op.rowIndex,
+        values: op.rows[0],
+      };
+    case "row.delete":
+      return {
+        type: "row.delete",
+        index: op.rowIndex,
+        deletedRow: op.deletedRows[0],
+      };
+    case "column.insert":
+      return {
+        type: "column.insert",
+        index: op.columnIndex,
+      };
+    case "column.delete":
+      return {
+        type: "column.delete",
+        index: op.columnIndex,
+      };
+    case "range.move":
+      return {
+        type: "range.move",
+        source: op.sourceRange,
+        destination: op.targetRange,
+        values: op.movedValues,
+      };
+    case "batch":
+      return {
+        type: "batch",
+        operations: op.operations.map(mapGridOpToPublicOp),
+      };
+  }
+}
+
 export function useHistory(
-  setData: (updater: (prev: ExcelatData) => ExcelatData) => void
+  setData: (updater: (prev: ExcelatData) => ExcelatData) => void,
+  onOperation?: (op: ExcelatOperation) => void
 ) {
   const [history, setHistory] = useState<HistoryState>({
     undoStack: [],
@@ -16,7 +77,7 @@ export function useHistory(
   });
 
   const executeOperation = useCallback(
-    (op: GridOperation) => {
+    (op: GridOperation, publicOp?: ExcelatOperation) => {
       setData((prevData) => {
         const nextData = applyOperation(prevData, op);
         return nextData;
@@ -26,8 +87,12 @@ export function useHistory(
         undoStack: [...prev.undoStack, op],
         redoStack: [],
       }));
+
+      if (onOperation) {
+        onOperation(publicOp || mapGridOpToPublicOp(op));
+      }
     },
-    [setData]
+    [setData, onOperation]
   );
 
   const undo = useCallback(() => {

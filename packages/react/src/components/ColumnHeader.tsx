@@ -9,6 +9,9 @@ export interface ColumnHeaderProps {
   showRowNumbers?: boolean;
   columnWidths?: Record<number, number>;
   defaultColWidth?: number;
+  visibleColIndices?: number[];
+  leftSpacerWidth?: number;
+  rightSpacerWidth?: number;
   isColumnSelected: (colIndex: number) => boolean;
   onSelectColumn?: (colIndex: number) => void;
   onSelectAll?: () => void;
@@ -24,13 +27,17 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = React.memo(
     showRowNumbers = true,
     columnWidths = {},
     defaultColWidth = 100,
+    visibleColIndices,
+    leftSpacerWidth = 0,
+    rightSpacerWidth = 0,
     isColumnSelected,
     onSelectColumn,
     onSelectAll,
     onStartResizeCol,
     onAutoFitCol,
   }) => {
-    const colIndices = Array.from({ length: totalCols }, (_, i) => i);
+    const colIndices =
+      visibleColIndices ?? Array.from({ length: totalCols }, (_, i) => i);
 
     return (
       <tr className="excelat-header-row" role="row">
@@ -44,6 +51,19 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = React.memo(
           >
             <div className="excelat-corner-inner" />
           </th>
+        )}
+
+        {leftSpacerWidth > 0 && (
+          <th
+            style={{
+              width: `${leftSpacerWidth}px`,
+              minWidth: `${leftSpacerWidth}px`,
+              maxWidth: `${leftSpacerWidth}px`,
+              padding: 0,
+              border: 0,
+            }}
+            aria-hidden="true"
+          />
         )}
 
         {colIndices.map((col) => {
@@ -96,6 +116,19 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = React.memo(
             </th>
           );
         })}
+
+        {rightSpacerWidth > 0 && (
+          <th
+            style={{
+              width: `${rightSpacerWidth}px`,
+              minWidth: `${rightSpacerWidth}px`,
+              maxWidth: `${rightSpacerWidth}px`,
+              padding: 0,
+              border: 0,
+            }}
+            aria-hidden="true"
+          />
+        )}
       </tr>
     );
   }

@@ -53,6 +53,11 @@ export type RangeMoveOp = {
   overwrittenValues: CellValue[][];
 };
 
+export type BatchOp = {
+  type: "batch";
+  operations: GridOperation[];
+};
+
 export type GridOperation =
   | CellUpdateOp
   | RangeClearOp
@@ -61,7 +66,8 @@ export type GridOperation =
   | RowDeleteOp
   | ColumnInsertOp
   | ColumnDeleteOp
-  | RangeMoveOp;
+  | RangeMoveOp
+  | BatchOp;
 
 /**
  * Creates an empty matrix filled with null values for a given range.
@@ -135,6 +141,11 @@ export function invertOperation(op: GridOperation): GridOperation {
         targetRange: op.sourceRange,
         movedValues: op.movedValues,
         overwrittenValues: op.overwrittenValues,
+      };
+    case "batch":
+      return {
+        type: "batch",
+        operations: op.operations.map(invertOperation).reverse(),
       };
   }
 }
@@ -281,6 +292,14 @@ export function applyOperation(data: ExcelatData, op: GridOperation): ExcelatDat
         values: op.movedValues,
       });
 
+      return nextData;
+    }
+
+    case "batch": {
+      let nextData = data;
+      for (const subOp of op.operations) {
+        nextData = applyOperation(nextData, subOp);
+      }
       return nextData;
     }
   }

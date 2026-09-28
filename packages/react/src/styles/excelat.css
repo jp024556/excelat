@@ -444,3 +444,115 @@
 .excelat-grid-viewport::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* Virtualization row spacer */
+.excelat-row-spacer {
+  pointer-events: none;
+}
+
+.excelat-row-spacer td {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+/* Pagination Bar */
+.excelat-pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background-color: #f8fafc;
+  border-top: 1px solid var(--excelat-gridline);
+  font-size: 12px;
+  color: #475569;
+  user-select: none;
+}
+
+.excelat-pagination-info {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.excelat-pagination-info strong {
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.excelat-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.excelat-page-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #334155;
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.excelat-page-btn:hover:not(:disabled) {
+  background-color: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.excelat-page-btn:active:not(:disabled) {
+  background-color: #e2e8f0;
+}
+
+.excelat-page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: #e2e8f0;
+}
+
+.excelat-page-current {
+  margin: 0 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #334155;
+}
+
+/* Loading Banner */
+.excelat-loading-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-top: 1px solid var(--excelat-gridline);
+  font-size: 12px;
+  font-weight: 500;
+  color: #475569;
+}
+
+.excelat-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #cbd5e1;
+  border-top-color: var(--excelat-primary);
+  border-radius: 50%;
+  animation: excelat-spin 0.75s linear infinite;
+}
+
+@keyframes excelat-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+

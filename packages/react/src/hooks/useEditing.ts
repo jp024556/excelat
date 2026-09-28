@@ -72,38 +72,44 @@ export function useEditing(
         initialText = currentVal !== null && currentVal !== undefined ? String(currentVal) : "";
       }
 
-      setEditingState({
+      const nextState: EditingState = {
         isEditing: true,
         value: initialText,
         coord,
         initialValue: currentVal,
-      });
+      };
+      editingStateRef.current = nextState;
+      setEditingState(nextState);
     },
     [getCellValue, readOnly]
   );
 
   const updateEditValue = useCallback((newValue: string) => {
+    editingStateRef.current = { ...editingStateRef.current, value: newValue };
     setEditingState((prev) => ({ ...prev, value: newValue }));
   }, []);
 
   const startOrUpdateEdit = useCallback(
     (coord: CellCoord, newValue: string) => {
       if (readOnly) return;
-      setEditingState((prev) => {
-        if (!prev.isEditing || prev.coord.row !== coord.row || prev.coord.col !== coord.col) {
-          const currentVal = getCellValue(coord.row, coord.col);
-          return {
-            isEditing: true,
-            value: newValue,
-            coord,
-            initialValue: currentVal,
-          };
-        }
-        return {
+      const prev = editingStateRef.current;
+      let nextState: EditingState;
+      if (!prev.isEditing || prev.coord.row !== coord.row || prev.coord.col !== coord.col) {
+        const currentVal = getCellValue(coord.row, coord.col);
+        nextState = {
+          isEditing: true,
+          value: newValue,
+          coord,
+          initialValue: currentVal,
+        };
+      } else {
+        nextState = {
           ...prev,
           value: newValue,
         };
-      });
+      }
+      editingStateRef.current = nextState;
+      setEditingState(nextState);
     },
     [getCellValue, readOnly]
   );
@@ -112,6 +118,13 @@ export function useEditing(
     (movement: EditMovement = "none") => {
       const state = editingStateRef.current;
       if (!state.isEditing) return;
+
+      // Immediately mark as not editing in ref to prevent duplicate commits from blur
+      editingStateRef.current = {
+        ...state,
+        isEditing: false,
+        value: "",
+      };
 
       const colType = getColumnType?.(state.coord.col);
       const parsed = parseInputValue(state.value, colType);
@@ -139,6 +152,11 @@ export function useEditing(
   );
 
   const cancelEdit = useCallback(() => {
+    editingStateRef.current = {
+      ...editingStateRef.current,
+      isEditing: false,
+      value: "",
+    };
     setEditingState((prev) => ({
       ...prev,
       isEditing: false,
