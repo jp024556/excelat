@@ -263,7 +263,7 @@ export function App() {
           <div>
             <div className="demo-title-row">
               <h1 className="demo-title">Excelat</h1>
-              <span className="demo-badge">V0.2</span>
+              <span className="demo-badge">V0.1</span>
             </div>
             <p className="demo-subtitle">
               Excel-like spreadsheet tables for React with first-class Virtualization, Controlled Pagination & Developer Operation Events.
