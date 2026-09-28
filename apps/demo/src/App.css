@@ -416,38 +416,6 @@ kbd {
   overflow-x: auto;
 }
 
-/* Custom Cell Renderers */
-.status-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: 9999px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-}
-
-.pill-active {
-  background: #dcfce7;
-  color: #15803d;
-}
-
-.pill-inactive {
-  background: #fee2e2;
-  color: #b91c1c;
-}
-
-.dept-tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 7px;
-  background: #f1f5f9;
-  color: #475569;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
 /* Custom Context Menu */
 .demo-context-menu {
   position: fixed;

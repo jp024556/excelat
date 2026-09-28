@@ -144,7 +144,7 @@ export const Cell: React.FC<CellProps> = React.memo(
             onCommit={(movement) => onCommitEdit?.(movement)}
             onCancel={() => onCancelEdit?.()}
           />
-        ) : render ? (
+        ) : render && value !== null && value !== undefined ? (
           <div className="excelat-cell-content">
             {render({ value, rowIndex: row, columnIndex: col })}
           </div>

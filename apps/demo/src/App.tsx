@@ -28,13 +28,13 @@ import {
 import "./App.css";
 
 const INITIAL_DATA: ExcelatData = [
-  ["Jay", 30, "Bangalore", 2200000, true, "Engineering"],
-  ["Rahul", 28, "Delhi", 1800000, true, "Design"],
-  ["Amit", 32, "Mumbai", 2500000, false, "Product"],
-  ["Priya", 26, "Hyderabad", 1950000, true, "Engineering"],
-  ["Neha", 31, "Pune", 2100000, true, "Analytics"],
-  ["Karan", 29, "Chennai", 1750000, false, "Marketing"],
-  ["Ananya", 27, "Bangalore", 2400000, true, "Engineering"],
+  ["Jay", 30, "Bangalore", 2200000, "Active", "Engineering"],
+  ["Rahul", 28, "Delhi", 1800000, "Active", "Design"],
+  ["Amit", 32, "Mumbai", 2500000, "Inactive", "Product"],
+  ["Priya", 26, "Hyderabad", 1950000, "Active", "Engineering"],
+  ["Neha", 31, "Pune", 2100000, "Active", "Analytics"],
+  ["Karan", 29, "Chennai", 1750000, "Inactive", "Marketing"],
+  ["Ananya", 27, "Bangalore", 2400000, "Active", "Engineering"],
 ];
 
 const TABLE_COLUMNS: ExcelatColumn[] = [
@@ -42,24 +42,8 @@ const TABLE_COLUMNS: ExcelatColumn[] = [
   { header: "Age", width: 80, type: "number" },
   { header: "City", width: 130, type: "text" },
   { header: "Salary (INR)", width: 140, type: "number" },
-  {
-    header: "Status",
-    width: 100,
-    type: "boolean",
-    render: ({ value }) => (
-      <span className={`status-pill ${value ? "pill-active" : "pill-inactive"}`}>
-        {value ? "Active" : "Inactive"}
-      </span>
-    ),
-  },
-  {
-    header: "Department",
-    width: 150,
-    type: "text",
-    render: ({ value }) => (
-      <span className="dept-tag">{String(value || "")}</span>
-    ),
-  },
+  { header: "Status", width: 100, type: "text" },
+  { header: "Department", width: 150, type: "text" },
 ];
 
 export function App() {
