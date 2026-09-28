@@ -14,11 +14,11 @@ import {
   Table as TableIcon,
   Sheet,
   Keyboard,
-  Sparkles,
   Check,
   Copy,
   Sliders,
   MoveHorizontal,
+  Code2,
 } from "lucide-react";
 import "./App.css";
 
@@ -322,8 +322,8 @@ export function App() {
         {/* Integration Examples */}
         <section className="demo-code-section">
           <div className="code-header">
-            <Sparkles size={16} />
-            <span>Developer Friendly API</span>
+            <Code2 size={16} />
+            <span>Usage Examples</span>
           </div>
           <div className="code-grid">
             <div>

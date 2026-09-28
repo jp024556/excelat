@@ -49,11 +49,14 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = React.memo(
         {colIndices.map((col) => {
           const selected = isColumnSelected(col);
           const customHeader = columns?.[col]?.header;
+          const colLetter = getColumnLabel(col);
           const label =
             customHeader !== undefined
-              ? customHeader
+              ? showColumnLetters
+                ? `${colLetter}: ${customHeader}`
+                : customHeader
               : showColumnLetters
-              ? getColumnLabel(col)
+              ? colLetter
               : "";
 
           const width = columnWidths[col] ?? columns?.[col]?.width ?? defaultColWidth;

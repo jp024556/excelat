@@ -39,6 +39,35 @@ describe("Excelat - Options & Modes", () => {
     expect(cell01).toHaveAttribute("aria-selected", "true");
   });
 
+  it("toggles column letters on and off in table mode with custom headers", () => {
+    const { container, rerender } = render(
+      <Excelat
+        data={sampleData}
+        mode="table"
+        columns={[{ header: "Name" }, { header: "Age" }]}
+        showColumnLetters={false}
+      />
+    );
+
+    let ths = container.querySelectorAll(".excelat-col-header");
+    expect(ths[0].textContent).toBe("Name");
+    expect(ths[1].textContent).toBe("Age");
+
+    // Enable column letters
+    rerender(
+      <Excelat
+        data={sampleData}
+        mode="table"
+        columns={[{ header: "Name" }, { header: "Age" }]}
+        showColumnLetters={true}
+      />
+    );
+
+    ths = container.querySelectorAll(".excelat-col-header");
+    expect(ths[0].textContent).toBe("A: Name");
+    expect(ths[1].textContent).toBe("B: Age");
+  });
+
   it("supports selectionStyle='subtle' without drag handle", () => {
     const { container } = render(
       <Excelat
