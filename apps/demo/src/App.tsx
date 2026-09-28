@@ -34,22 +34,122 @@ import "./App.css";
 
 type DemoScenario = "standard" | "virtualization" | "pagination" | "infinite";
 
+// Custom Dropdown Editor for Status column
+function StatusDropdownEditor({
+  value,
+  onChange,
+  onCommit,
+  onCancel,
+}: {
+  value: any;
+  onChange: (val: any) => void;
+  onCommit: (movement?: any, directVal?: any) => void;
+  onCancel: () => void;
+}) {
+  return (
+    <select
+      value={String(value ?? "Active")}
+      onChange={(e) => {
+        onChange(e.target.value);
+        onCommit();
+      }}
+      onBlur={() => onCommit()}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onCancel();
+        if (e.key === "Enter") onCommit();
+      }}
+      autoFocus
+    >
+      <option value="Active">Active</option>
+      <option value="Inactive">Inactive</option>
+      <option value="Pending">Pending</option>
+    </select>
+  );
+}
+
+// Custom Date Picker Editor for Join Date column
+function DateInputEditor({
+  value,
+  onChange,
+  onCommit,
+  onCancel,
+}: {
+  value: any;
+  onChange: (val: any) => void;
+  onCommit: (movement?: any, directVal?: any) => void;
+  onCancel: () => void;
+}) {
+  return (
+    <input
+      type="date"
+      value={String(value ?? "")}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={() => onCommit()}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onCancel();
+        if (e.key === "Enter") onCommit();
+      }}
+      autoFocus
+    />
+  );
+}
+
 const INITIAL_DATA: ExcelatData = [
-  ["Jay", 30, "Bangalore", 2200000, "Active", "Engineering"],
-  ["Rahul", 28, "Delhi", 1800000, "Active", "Design"],
-  ["Amit", 32, "Mumbai", 2500000, "Inactive", "Product"],
-  ["Priya", 26, "Hyderabad", 1950000, "Active", "Engineering"],
-  ["Neha", 31, "Pune", 2100000, "Active", "Analytics"],
-  ["Karan", 29, "Chennai", 1750000, "Inactive", "Marketing"],
-  ["Ananya", 27, "Bangalore", 2400000, "Active", "Engineering"],
+  ["Jay", 30, "Bangalore", 2200000, "Active", "2023-01-15", "Engineering"],
+  ["Rahul", 28, "Delhi", 1800000, "Active", "2023-06-20", "Design"],
+  ["Amit", 32, "Mumbai", 2500000, "Inactive", "2022-11-05", "Product"],
+  ["Priya", 26, "Hyderabad", 1950000, "Active", "2024-02-10", "Engineering"],
+  ["Neha", 31, "Pune", 2100000, "Active", "2023-08-14", "Analytics"],
+  ["Karan", 29, "Chennai", 1750000, "Inactive", "2022-04-18", "Marketing"],
+  ["Ananya", 27, "Bangalore", 2400000, "Active", "2024-05-01", "Engineering"],
 ];
 
 const TABLE_COLUMNS: ExcelatColumn[] = [
   { header: "Name", width: 120, type: "text" },
   { header: "Age", width: 80, type: "number" },
   { header: "City", width: 130, type: "text" },
-  { header: "Salary (INR)", width: 140, type: "number" },
-  { header: "Status", width: 100, type: "text" },
+  {
+    header: "Salary (INR)",
+    width: 140,
+    type: "number",
+    render: ({ value }) => (
+      <span style={{ fontWeight: 600 }}>
+        ₹{Number(value || 0).toLocaleString("en-IN")}
+      </span>
+    ),
+  },
+  {
+    header: "Status",
+    width: 110,
+    type: "text",
+    render: ({ value }) => (
+      <span
+        style={{
+          display: "inline-block",
+          padding: "2px 8px",
+          borderRadius: "12px",
+          fontSize: "11px",
+          fontWeight: 600,
+          background: value === "Active" ? "#dcfce7" : "#fee2e2",
+          color: value === "Active" ? "#15803d" : "#b91c1c",
+        }}
+      >
+        {String(value || "")}
+      </span>
+    ),
+    editor: StatusDropdownEditor,
+  },
+  {
+    header: "Join Date",
+    width: 130,
+    type: "date",
+    render: ({ value }) => (
+      <span style={{ color: "#475569" }}>
+        {value ? new Date(String(value)).toLocaleDateString() : ""}
+      </span>
+    ),
+    editor: DateInputEditor,
+  },
   { header: "Department", width: 150, type: "text" },
 ];
 

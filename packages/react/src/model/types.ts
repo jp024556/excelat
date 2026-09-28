@@ -20,21 +20,39 @@ export type ExcelatMode = "table" | "spreadsheet";
 
 export type SelectionStyle = "excel" | "subtle" | "none";
 
-export type ColumnType = "text" | "number" | "boolean";
+export type ExcelatColumnType = "text" | "number" | "boolean" | "date";
+export type ColumnType = ExcelatColumnType;
+
+export type EditMovement = "none" | "down" | "up" | "right" | "left";
 
 export interface CellRenderContext {
   value: CellValue;
   rowIndex: number;
   columnIndex: number;
+  row?: CellValue[];
 }
+
+export interface CustomCellEditorProps {
+  value: CellValue;
+  row: number;
+  col: number;
+  rowData?: CellValue[];
+  column?: ExcelatColumn;
+  onChange: (value: CellValue) => void;
+  onCommit: (movement?: EditMovement, directValue?: CellValue) => void;
+  onCancel: () => void;
+}
+
+export type CustomCellEditor = React.ComponentType<CustomCellEditorProps>;
 
 export interface ExcelatColumn {
   header?: string;
   width?: number;
   minWidth?: number;
   maxWidth?: number;
-  type?: ColumnType;
+  type?: ExcelatColumnType;
   render?: (context: CellRenderContext) => React.ReactNode;
+  editor?: CustomCellEditor;
 }
 
 export interface ContextMenuContext {

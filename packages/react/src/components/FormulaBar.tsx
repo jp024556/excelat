@@ -6,7 +6,7 @@ export interface FormulaBarProps {
   activeCoordText: string;
   activeValue: CellValue;
   isEditing: boolean;
-  editValue: string;
+  editValue: CellValue;
   onChange: (value: string) => void;
   onCommit: (movement?: EditMovement) => void;
   onCancel: () => void;
@@ -26,7 +26,9 @@ export const FormulaBar: React.FC<FormulaBarProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const displayValue = isEditing
-    ? editValue
+    ? editValue !== null && editValue !== undefined
+      ? String(editValue)
+      : ""
     : activeValue !== null && activeValue !== undefined
     ? String(activeValue)
     : "";

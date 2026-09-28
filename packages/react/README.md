@@ -6,7 +6,7 @@
 [![npm version](https://img.shields.io/npm/v/@excelat/react.svg)](https://www.npmjs.com/package/@excelat/react)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![bundle size](https://img.shields.io/badge/bundle%20size-13.8%20kB%20gzipped-success.svg)](https://www.npmjs.com/package/@excelat/react)
-[![tests](https://img.shields.io/badge/tests-49%20passing-brightgreen.svg)]()
+[![tests](https://img.shields.io/badge/tests-57%20passing-brightgreen.svg)]()
 
 Excelat delivers the rich spreadsheet interaction users expect — cell and range selection, keyboard navigation, copy/paste, inline editing, formula bar, drag-fill, range-moving, undo/redo, row/column resizing, and first-class virtualization — inside your React app **without forcing you to adopt an enormous, opinionated grid framework.**
 
@@ -49,7 +49,10 @@ export function App() {
   - [Granular Operations Model](#granular-operations-model)
   - [Batch Operations](#batch-operations)
   - [Persistence Strategies (Immediate, Debounced, Batch, Optimistic)](#persistence-strategies)
-- [Custom Cell Rendering & Column Types](#custom-cell-rendering--column-types)
+- [Custom Cell Types, Rendering & Editing](#custom-cell-types-rendering--editing)
+  - [Custom Rendering (`render`)](#custom-rendering-render)
+  - [Custom Cell Editors (`editor`)](#custom-cell-editors-editor)
+  - [Separation of Concerns & Combinations](#separation-of-concerns--combinations)
 - [Keyboard Navigation & Shortcuts](#keyboard-navigation--shortcuts)
 - [Imperative Ref API](#imperative-ref-api)
 - [Complete API Reference](#complete-api-reference)
@@ -468,47 +471,161 @@ const handleOperation = (op: ExcelatOperation) => {
 
 ---
 
-## Custom Cell Rendering & Column Types
+## Custom Cell Types, Rendering & Editing
 
-Customize cell formatting in table mode with `render` and enforce input parsing with `type`:
+Excelat keeps data semantics, display rendering, and editing as **three completely separate concerns**:
+
+```text
+type
+  → basic value semantics / parsing ("text" | "number" | "boolean" | "date")
+
+render
+  → normal display (formatted currency, badges, dates, avatars, buttons)
+
+editor
+  → editing UI (dropdowns, date pickers, custom inputs, rating selectors)
+```
+
+The core data model remains intentionally generic:
+
+```ts
+type CellValue = string | number | boolean | null;
+```
+
+Excelat supports a small set of basic built-in column types where they affect parsing or editing behavior:
+
+```ts
+type ExcelatColumnType = "text" | "number" | "boolean" | "date";
+```
+
+---
+
+### Custom Rendering (`render`)
+
+Add an optional custom `render` callback to any column definition. The renderer receives `{ value, rowIndex, columnIndex, row }` and can return any React content (formatted text, badges, currency, dates, icons, avatars, buttons):
 
 ```tsx
-import { Excelat, ExcelatColumn } from "@excelat/react";
-
 const columns: ExcelatColumn[] = [
+  // 1. Formatted Currency Display
   {
-    header: "Employee",
-    width: 140,
-    type: "text",
-  },
-  {
-    header: "Age",
-    width: 80,
-    type: "number", // Automatically coerces numbers on edit
-  },
-  {
-    header: "Salary",
-    width: 120,
+    header: "Revenue",
     type: "number",
-    render: ({ value }) => (
-      <span style={{ fontWeight: 600 }}>
-        ${Number(value || 0).toLocaleString()}
+    render: ({ value }) => <strong>${Number(value || 0).toLocaleString()}</strong>,
+  },
+
+  // 2. Formatted Date Display
+  {
+    header: "Created Date",
+    type: "date",
+    render: ({ value }) => <span>{value ? new Date(String(value)).toLocaleDateString() : ""}</span>,
+  },
+
+  // 3. Status Badge with Full Row Access
+  {
+    header: "Status",
+    render: ({ value, row }) => (
+      <span className={value === "Active" ? "badge-active" : "badge-inactive"}>
+        {String(value)}
       </span>
     ),
   },
+
+  // 4. Interactive Action Buttons
   {
-    header: "Status",
-    width: 100,
-    render: ({ value }) => (
-      <span className={value === "Active" ? "badge-green" : "badge-gray"}>
-        {String(value || "")}
-      </span>
+    header: "Actions",
+    render: ({ rowIndex, row }) => (
+      <button
+        type="button"
+        onClick={() => handleDeleteUser(rowIndex)}
+      >
+        Delete
+      </button>
     ),
   },
 ];
-
-<Excelat data={data} mode="table" columns={columns} />
 ```
+
+> **Interactive Elements in Custom Renderers:** Buttons, links, inputs, and checkboxes inside custom cell renderers can be clicked and interacted with naturally. Excelat automatically detects interactive elements and prevents unwanted cell drag-selection or double-click editing.
+
+---
+
+### Custom Cell Editors (`editor`)
+
+Add an optional `editor` component to any column independently from `render`. 
+
+A custom editor is rendered **only when the cell enters edit mode** (via double-click, <kbd>F2</kbd>, or <kbd>Enter</kbd>). When not editing, the cell displays normally using `render` (or standard text).
+
+```tsx
+import { CustomCellEditorProps } from "@excelat/react";
+
+// Status dropdown editor
+function StatusEditor({
+  value,
+  onChange,
+  onCommit,
+  onCancel,
+}: CustomCellEditorProps) {
+  return (
+    <select
+      value={String(value ?? "Active")}
+      onChange={(e) => {
+        onChange(e.target.value);
+        onCommit(); // Commit immediately on select change
+      }}
+      onBlur={() => onCommit()}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onCancel();
+        if (e.key === "Enter") onCommit();
+      }}
+      autoFocus
+    >
+      <option value="Active">Active</option>
+      <option value="Inactive">Inactive</option>
+      <option value="Pending">Pending</option>
+    </select>
+  );
+}
+
+// Attach to column definition
+const columns: ExcelatColumn[] = [
+  {
+    header: "Status",
+    render: ({ value }) => <StatusBadge value={value} />, // How the cell looks
+    editor: StatusEditor,                                 // How the cell is edited
+  },
+];
+```
+
+#### Custom Editor Props
+
+Your custom editor receives:
+
+```ts
+export interface CustomCellEditorProps {
+  value: CellValue;                                                   // Current cell value
+  row: number;                                                         // 0-based row index
+  col: number;                                                         // 0-based column index
+  rowData?: CellValue[];                                               // Entire row data array
+  column?: ExcelatColumn;                                              // Column definition
+  onChange: (value: CellValue) => void;                                // Update editor state
+  onCommit: (movement?: EditMovement, directValue?: CellValue) => void; // Save and exit edit mode
+  onCancel: () => void;                                                // Cancel without saving
+}
+```
+
+---
+
+### Separation of Concerns & Combinations
+
+Because rendering and editing are completely independent, you can mix and match them freely:
+
+* **Formatted Date + Date Editor:** Formatted string display (`render`) with an HTML5 `<input type="date">` editor (`editor`).
+* **Currency Display + Number Editor:** `$1,200.00` display with a numeric input editor.
+* **Status Badge + Status Dropdown Editor:** Pill badge display with a `<select>` dropdown editor.
+* **Avatar Display + Text Editor:** User avatar display with a standard text editor.
+* **Custom Display + Custom Editor:** Both custom components.
+
+Excelat retains full ownership of grid interactions (selection, keyboard navigation, copy/paste, undo/redo, auto-scrolling, virtualization), so your custom renderers and editors never need to reimplement spreadsheet mechanics.
 
 ---
 
@@ -634,7 +751,7 @@ Excelat
 └── HistoryManager        # Atomic GridOperation stack & public ExcelatOperation dispatcher
 ```
 
-1. **DX First:** `<Excelat data={data} />` requires zero setup. Opt into advanced capabilities (`virtualization`, `pagination`, `onOperation`) only when you need them.
+1. **DX First:** `<Excelat data={data} />` requires zero setup. Opt into advanced capabilities (`virtualization`, `pagination`, `onOperation`, custom `render`, custom `editor`) only when you need them.
 2. **Framework Freedom:** Excelat never assumes what backend or transport protocol you use.
 3. **No Heavy Dependencies:** No canvas black-boxes. Fully accessible HTML tables that respect standard browser CSS styling, printing, and accessibility tools.
 

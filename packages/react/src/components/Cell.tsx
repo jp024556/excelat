@@ -1,5 +1,11 @@
 import React from "react";
-import { CellValue, SelectionStyle, CellRenderContext } from "../model/types";
+import {
+  CellValue,
+  SelectionStyle,
+  CellRenderContext,
+  ExcelatColumn,
+  CustomCellEditor,
+} from "../model/types";
 import { CellEditor } from "./CellEditor";
 import { EditMovement } from "../hooks/useEditing";
 
@@ -13,22 +19,25 @@ export interface CellProps {
   selectionStyle?: SelectionStyle;
   width?: number;
   height?: number;
-  editValue?: string;
+  editValue?: CellValue;
   isTopEdge?: boolean;
   isBottomEdge?: boolean;
   isLeftEdge?: boolean;
   isRightEdge?: boolean;
   isFillTarget?: boolean;
   isMoveTarget?: boolean;
+  column?: ExcelatColumn;
+  rowData?: CellValue[];
   render?: (context: CellRenderContext) => React.ReactNode;
+  editor?: CustomCellEditor;
   onMouseDown: (e: React.MouseEvent, row: number, col: number) => void;
   onMouseEnter: (row: number, col: number) => void;
   onDoubleClick: (row: number, col: number) => void;
   onContextMenu?: (e: React.MouseEvent, row: number, col: number) => void;
   onFillHandleMouseDown?: (e: React.MouseEvent) => void;
   onRangeBorderMouseDown?: (e: React.MouseEvent) => void;
-  onEditValueChange?: (value: string) => void;
-  onCommitEdit?: (movement?: EditMovement) => void;
+  onEditValueChange?: (value: CellValue) => void;
+  onCommitEdit?: (movement?: EditMovement, directValue?: CellValue) => void;
   onCancelEdit?: () => void;
 }
 
@@ -50,7 +59,10 @@ export const Cell: React.FC<CellProps> = React.memo(
     isRightEdge,
     isFillTarget,
     isMoveTarget,
+    column,
+    rowData,
     render,
+    editor,
     onMouseDown,
     onMouseEnter,
     onDoubleClick,
@@ -110,18 +122,41 @@ export const Cell: React.FC<CellProps> = React.memo(
     const hasBorderEdge = isTopEdge || isBottomEdge || isLeftEdge || isRightEdge;
 
     const handleCellMouseDown = (e: React.MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+
+      // If clicking an interactive element inside custom render, do not trigger cell selection or range dragging
+      if (
+        target?.closest(
+          "button, a, input, select, textarea, [role='button'], [role='checkbox'], [data-interactive='true']"
+        )
+      ) {
+        return;
+      }
+
       // If clicking near border of selected range (and not in edit mode), trigger range move
       if (
         hasBorderEdge &&
         isSelected &&
         !isEditing &&
         onRangeBorderMouseDown &&
-        (e.target as HTMLElement).classList.contains("excelat-cell-border-drag-zone")
+        target?.classList.contains("excelat-cell-border-drag-zone")
       ) {
         onRangeBorderMouseDown(e);
         return;
       }
       onMouseDown(e, row, col);
+    };
+
+    const handleCellDoubleClick = (e: React.MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.closest(
+          "button, a, input, select, textarea, [role='button'], [role='checkbox'], [data-interactive='true']"
+        )
+      ) {
+        return;
+      }
+      onDoubleClick(row, col);
     };
 
     return (
@@ -134,19 +169,39 @@ export const Cell: React.FC<CellProps> = React.memo(
         data-col={col}
         onMouseDown={handleCellMouseDown}
         onMouseEnter={() => onMouseEnter(row, col)}
-        onDoubleClick={() => onDoubleClick(row, col)}
+        onDoubleClick={handleCellDoubleClick}
         onContextMenu={(e) => onContextMenu?.(e, row, col)}
       >
         {isEditing ? (
-          <CellEditor
-            value={editValue}
-            onChange={(val) => onEditValueChange?.(val)}
-            onCommit={(movement) => onCommitEdit?.(movement)}
-            onCancel={() => onCancelEdit?.()}
-          />
-        ) : render && value !== null && value !== undefined ? (
+          editor ? (
+            <div
+              className="excelat-custom-editor-wrapper"
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              {React.createElement(editor, {
+                value: editValue,
+                row,
+                col,
+                rowData,
+                column,
+                onChange: (val: CellValue) => onEditValueChange?.(val),
+                onCommit: (movement?: EditMovement, directVal?: CellValue) =>
+                  onCommitEdit?.(movement, directVal),
+                onCancel: () => onCancelEdit?.(),
+              })}
+            </div>
+          ) : (
+            <CellEditor
+              value={editValue !== null && editValue !== undefined ? String(editValue) : ""}
+              onChange={(val) => onEditValueChange?.(val)}
+              onCommit={(movement) => onCommitEdit?.(movement)}
+              onCancel={() => onCancelEdit?.()}
+            />
+          )
+        ) : render ? (
           <div className="excelat-cell-content">
-            {render({ value, rowIndex: row, columnIndex: col })}
+            {render({ value, rowIndex: row, columnIndex: col, row: rowData })}
           </div>
         ) : (
           <div className="excelat-cell-content" title={formattedText}>

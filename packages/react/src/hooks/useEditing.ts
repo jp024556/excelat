@@ -6,7 +6,7 @@ export type EditMovement = "none" | "down" | "up" | "right" | "left";
 
 export interface EditingState {
   isEditing: boolean;
-  value: string;
+  value: CellValue;
   coord: CellCoord;
   initialValue: CellValue;
 }
@@ -24,6 +24,10 @@ export function parseInputValue(input: string, columnType?: ColumnType): CellVal
     if (trimmed.toLowerCase() === "true") return true;
     if (trimmed.toLowerCase() === "false") return false;
     return Boolean(trimmed);
+  }
+
+  if (columnType === "date") {
+    return trimmed;
   }
 
   if (columnType === "text") {
@@ -62,19 +66,19 @@ export function useEditing(
     (coord: CellCoord, initialKey?: string) => {
       if (readOnly) return;
       const currentVal = getCellValue(coord.row, coord.col);
-      let initialText = "";
+      let initialVal: CellValue = "";
 
       if (initialKey !== undefined) {
         // User typed a printable character: replace existing value
-        initialText = initialKey;
+        initialVal = initialKey;
       } else {
         // Double-click, F2, Enter, or formula bar click: start with existing value
-        initialText = currentVal !== null && currentVal !== undefined ? String(currentVal) : "";
+        initialVal = currentVal !== null && currentVal !== undefined ? currentVal : "";
       }
 
       const nextState: EditingState = {
         isEditing: true,
-        value: initialText,
+        value: initialVal,
         coord,
         initialValue: currentVal,
       };
@@ -84,13 +88,13 @@ export function useEditing(
     [getCellValue, readOnly]
   );
 
-  const updateEditValue = useCallback((newValue: string) => {
+  const updateEditValue = useCallback((newValue: CellValue) => {
     editingStateRef.current = { ...editingStateRef.current, value: newValue };
     setEditingState((prev) => ({ ...prev, value: newValue }));
   }, []);
 
   const startOrUpdateEdit = useCallback(
-    (coord: CellCoord, newValue: string) => {
+    (coord: CellCoord, newValue: CellValue) => {
       if (readOnly) return;
       const prev = editingStateRef.current;
       let nextState: EditingState;
@@ -115,7 +119,7 @@ export function useEditing(
   );
 
   const commitEdit = useCallback(
-    (movement: EditMovement = "none") => {
+    (movement: EditMovement = "none", directValue?: CellValue) => {
       const state = editingStateRef.current;
       if (!state.isEditing) return;
 
@@ -127,7 +131,8 @@ export function useEditing(
       };
 
       const colType = getColumnType?.(state.coord.col);
-      const parsed = parseInputValue(state.value, colType);
+      const rawValue = directValue !== undefined ? directValue : state.value;
+      const parsed = typeof rawValue === "string" ? parseInputValue(rawValue, colType) : rawValue;
       if (parsed !== state.initialValue) {
         executeOperation({
           type: "cell.update",

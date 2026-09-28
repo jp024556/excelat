@@ -1,5 +1,5 @@
 import React from "react";
-import { CellCoord, CellRange, ExcelatData, ExcelatColumn, SelectionStyle, ExcelatMode } from "../model/types";
+import { CellValue, CellCoord, CellRange, ExcelatData, ExcelatColumn, SelectionStyle, ExcelatMode } from "../model/types";
 import { ColumnHeader } from "./ColumnHeader";
 import { RowHeader } from "./RowHeader";
 import { Cell } from "./Cell";
@@ -24,7 +24,7 @@ export interface GridProps {
   activeCell: CellCoord;
   isEditing: boolean;
   editCoord: CellCoord;
-  editValue: string;
+  editValue: CellValue;
   fillTargetRange?: CellRange | null;
   moveTargetRange?: CellRange | null;
   virtualization?: VirtualizationState;
@@ -35,8 +35,8 @@ export interface GridProps {
   onContextMenuCell?: (e: React.MouseEvent, row: number, col: number) => void;
   onFillHandleMouseDown?: (e: React.MouseEvent) => void;
   onRangeBorderMouseDown?: (e: React.MouseEvent) => void;
-  onEditValueChange: (val: string) => void;
-  onCommitEdit: (movement?: EditMovement) => void;
+  onEditValueChange: (val: CellValue) => void;
+  onCommitEdit: (movement?: EditMovement, directValue?: CellValue) => void;
   onCancelEdit: () => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => void;
   onSelectRow: (rowIndex: number) => void;
@@ -250,7 +250,10 @@ export const Grid: React.FC<GridProps> = ({
                       isRightEdge={isRightEdge}
                       isFillTarget={isFillTarget}
                       isMoveTarget={isMoveTarget}
+                      column={columns?.[col]}
+                      rowData={data[row]}
                       render={columns?.[col]?.render}
+                      editor={columns?.[col]?.editor}
                       onMouseDown={onMouseDownCell}
                       onMouseEnter={onMouseEnterCell}
                       onDoubleClick={onDoubleClickCell}
