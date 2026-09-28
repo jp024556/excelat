@@ -20,9 +20,40 @@ export type ExcelatMode = "table" | "spreadsheet";
 
 export type SelectionStyle = "excel" | "subtle" | "none";
 
+export type ColumnType = "text" | "number" | "boolean";
+
+export interface CellRenderContext {
+  value: CellValue;
+  rowIndex: number;
+  columnIndex: number;
+}
+
 export interface ExcelatColumn {
   header?: string;
   width?: number;
+  minWidth?: number;
+  maxWidth?: number;
+  type?: ColumnType;
+  render?: (context: CellRenderContext) => React.ReactNode;
+}
+
+export interface ContextMenuContext {
+  rowIndex: number;
+  columnIndex: number;
+  selection: CellRange;
+}
+
+export interface ExcelatRef {
+  insertRow: (index?: number) => void;
+  deleteRow: (index?: number) => void;
+  insertColumn: (index?: number) => void;
+  deleteColumn: (index?: number) => void;
+  undo: () => void;
+  redo: () => void;
+  copy: () => Promise<string | undefined>;
+  cut: () => Promise<string | undefined>;
+  paste: () => Promise<void>;
+  focus: () => void;
 }
 
 export interface ExcelatProps {
@@ -69,7 +100,7 @@ export interface ExcelatProps {
    */
   showFormulaBar?: boolean;
   /**
-   * Callback fired when data changes (via edit, paste, delete, undo, redo).
+   * Callback fired when data changes (via edit, paste, delete, undo, redo, structural operations).
    */
   onChange?: (nextData: ExcelatData) => void;
   /**
@@ -84,6 +115,10 @@ export interface ExcelatProps {
    * Callback fired when a row is resized.
    */
   onRowResize?: (rowIndex: number, height: number) => void;
+  /**
+   * Callback fired when right-clicking inside the grid or headers.
+   */
+  onContextMenu?: (event: React.MouseEvent, context: ContextMenuContext) => void;
   /**
    * Optional custom class name for the root container.
    */

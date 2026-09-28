@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import {
   Excelat,
   ExcelatData,
@@ -6,6 +6,7 @@ import {
   ExcelatMode,
   SelectionStyle,
   ExcelatColumn,
+  ExcelatRef,
   getColumnLabel,
   getRowLabel,
 } from "@excelat/react";
@@ -19,6 +20,10 @@ import {
   Sliders,
   MoveHorizontal,
   Code2,
+  Undo2,
+  Redo2,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import "./App.css";
 
@@ -33,21 +38,38 @@ const INITIAL_DATA: ExcelatData = [
 ];
 
 const TABLE_COLUMNS: ExcelatColumn[] = [
-  { header: "Name", width: 120 },
-  { header: "Age", width: 80 },
-  { header: "City", width: 130 },
-  { header: "Salary (INR)", width: 140 },
-  { header: "Active", width: 90 },
-  { header: "Department", width: 150 },
+  { header: "Name", width: 120, type: "text" },
+  { header: "Age", width: 80, type: "number" },
+  { header: "City", width: 130, type: "text" },
+  { header: "Salary (INR)", width: 140, type: "number" },
+  {
+    header: "Status",
+    width: 100,
+    type: "boolean",
+    render: ({ value }) => (
+      <span className={`status-pill ${value ? "pill-active" : "pill-inactive"}`}>
+        {value ? "Active" : "Inactive"}
+      </span>
+    ),
+  },
+  {
+    header: "Department",
+    width: 150,
+    type: "text",
+    render: ({ value }) => (
+      <span className="dept-tag">{String(value || "")}</span>
+    ),
+  },
 ];
 
 export function App() {
+  const gridRef = useRef<ExcelatRef>(null);
   const [data, setData] = useState<ExcelatData>(INITIAL_DATA);
   const [mode, setMode] = useState<ExcelatMode>("spreadsheet");
   const [selectionStyle, setSelectionStyle] = useState<SelectionStyle>("excel");
   const [showRowNumbers, setShowRowNumbers] = useState<boolean>(true);
   const [showColumnLetters, setShowColumnLetters] = useState<boolean>(true);
-  const [showFormulaBar, setShowFormulaBar] = useState<boolean>(false);
+  const [showFormulaBar, setShowFormulaBar] = useState<boolean>(true);
   const [selection, setSelection] = useState<CellRange>({
     startRow: 0,
     startColumn: 0,
@@ -55,6 +77,19 @@ export function App() {
     endColumn: 0,
   });
   const [copiedNotification, setCopiedNotification] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    rowIndex: number;
+    columnIndex: number;
+  } | null>(null);
+
+  // Close context menu on outside click
+  useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    window.addEventListener("click", handleClick);
+    return () => window.removeEventListener("click", handleClick);
+  }, []);
 
   // Switch presets cleanly when mode changes
   const handleModeChange = (newMode: ExcelatMode) => {
@@ -68,6 +103,7 @@ export function App() {
       setSelectionStyle("excel");
       setShowRowNumbers(true);
       setShowColumnLetters(true);
+      setShowFormulaBar(true);
     }
   };
 
@@ -106,8 +142,8 @@ export function App() {
   const handleCopyCode = () => {
     navigator.clipboard.writeText(
       mode === "table"
-        ? `<Excelat\n  data={data}\n  mode="table"\n  columns={[\n    { header: "Name" },\n    { header: "Age" },\n    { header: "City" }\n  ]}\n/>`
-        : `<Excelat\n  data={data}\n  rows={50}\n  columns={16}\n/>`
+        ? `<Excelat\n  data={data}\n  mode="table"\n  columns={[\n    { header: "Name", type: "text" },\n    { header: "Age", type: "number" },\n    { header: "City", type: "text" },\n    {\n      header: "Status",\n      render: ({ value }) => <StatusBadge active={value} />\n    }\n  ]}\n/>`
+        : `<Excelat\n  data={data}\n  rows={50}\n  columns={16}\n  showFormulaBar={true}\n/>`
     );
     setCopiedNotification(true);
     setTimeout(() => setCopiedNotification(false), 2000);
@@ -214,11 +250,74 @@ export function App() {
         </div>
       </section>
 
+      {/* Grid Operations Toolbar */}
+      <section className="demo-toolbar">
+        <div className="demo-toolbar-group">
+          <button
+            className="demo-tool-btn"
+            title="Undo (Ctrl+Z)"
+            onClick={() => gridRef.current?.undo()}
+          >
+            <Undo2 size={13} />
+            <span>Undo</span>
+          </button>
+          <button
+            className="demo-tool-btn"
+            title="Redo (Ctrl+Y)"
+            onClick={() => gridRef.current?.redo()}
+          >
+            <Redo2 size={13} />
+            <span>Redo</span>
+          </button>
+          <div className="demo-tool-sep" />
+          <button
+            className="demo-tool-btn"
+            title="Insert row below active cell"
+            onClick={() => gridRef.current?.insertRow()}
+          >
+            <Plus size={13} />
+            <span>Insert Row</span>
+          </button>
+          <button
+            className="demo-tool-btn"
+            title="Delete active row"
+            onClick={() => gridRef.current?.deleteRow()}
+          >
+            <Trash2 size={13} />
+            <span>Delete Row</span>
+          </button>
+          <div className="demo-tool-sep" />
+          <button
+            className="demo-tool-btn"
+            title="Insert column right of active cell"
+            onClick={() => gridRef.current?.insertColumn()}
+          >
+            <Plus size={13} />
+            <span>Insert Col</span>
+          </button>
+          <button
+            className="demo-tool-btn"
+            title="Delete active column"
+            onClick={() => gridRef.current?.deleteColumn()}
+          >
+            <Trash2 size={13} />
+            <span>Delete Col</span>
+          </button>
+        </div>
+
+        <div className="demo-toolbar-group">
+          <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+            Tip: Right-click any cell for context actions
+          </span>
+        </div>
+      </section>
+
       {/* Main Grid Viewport */}
       <main className="demo-main">
         <div className="demo-grid-card">
           <div className="demo-spreadsheet-container">
             <Excelat
+              ref={gridRef}
               data={data}
               mode={mode}
               columns={mode === "table" ? TABLE_COLUMNS : 15}
@@ -229,8 +328,95 @@ export function App() {
               showFormulaBar={showFormulaBar}
               onChange={setData}
               onSelectionChange={setSelection}
+              onContextMenu={(e, ctx) => {
+                e.preventDefault();
+                setContextMenu({
+                  x: e.clientX,
+                  y: e.clientY,
+                  rowIndex: ctx.rowIndex,
+                  columnIndex: ctx.columnIndex,
+                });
+              }}
             />
           </div>
+
+          {/* Context Menu */}
+          {contextMenu && (
+            <div
+              className="demo-context-menu"
+              style={{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                className="demo-context-item"
+                onClick={() => {
+                  gridRef.current?.copy();
+                  setContextMenu(null);
+                }}
+              >
+                <span>Copy</span>
+                <span className="demo-context-shortcut">Ctrl+C</span>
+              </button>
+              <button
+                className="demo-context-item"
+                onClick={() => {
+                  gridRef.current?.paste();
+                  setContextMenu(null);
+                }}
+              >
+                <span>Paste</span>
+                <span className="demo-context-shortcut">Ctrl+V</span>
+              </button>
+              <button
+                className="demo-context-item"
+                onClick={() => {
+                  gridRef.current?.cut();
+                  setContextMenu(null);
+                }}
+              >
+                <span>Cut</span>
+                <span className="demo-context-shortcut">Ctrl+X</span>
+              </button>
+              <div className="demo-context-sep" />
+              <button
+                className="demo-context-item"
+                onClick={() => {
+                  gridRef.current?.insertRow(contextMenu.rowIndex);
+                  setContextMenu(null);
+                }}
+              >
+                <span>Insert Row Here</span>
+              </button>
+              <button
+                className="demo-context-item"
+                onClick={() => {
+                  gridRef.current?.deleteRow(contextMenu.rowIndex);
+                  setContextMenu(null);
+                }}
+              >
+                <span>Delete This Row</span>
+              </button>
+              <div className="demo-context-sep" />
+              <button
+                className="demo-context-item"
+                onClick={() => {
+                  gridRef.current?.insertColumn(contextMenu.columnIndex);
+                  setContextMenu(null);
+                }}
+              >
+                <span>Insert Column Here</span>
+              </button>
+              <button
+                className="demo-context-item"
+                onClick={() => {
+                  gridRef.current?.deleteColumn(contextMenu.columnIndex);
+                  setContextMenu(null);
+                }}
+              >
+                <span>Delete This Column</span>
+              </button>
+            </div>
+          )}
 
           {/* Status Bar */}
           <div className="demo-status-bar">

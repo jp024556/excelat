@@ -346,6 +346,33 @@
   background-color: #ffffff;
 }
 
+/* Drag to Move and Fill Targets */
+.excelat-cell-fill-target {
+  background-color: var(--excelat-primary-light) !important;
+  outline: 1.5px dashed var(--excelat-primary) !important;
+  outline-offset: -1px;
+}
+
+.excelat-cell-move-target {
+  background-color: rgba(37, 99, 235, 0.1) !important;
+  outline: 1.5px dashed var(--excelat-subtle-blue) !important;
+  outline-offset: -1px;
+}
+
+.excelat-cell-border-drag-zone {
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  cursor: grab;
+  z-index: 4;
+}
+
+.excelat-cell-border-drag-zone:active {
+  cursor: grabbing;
+}
+
 /* Inline Cell Editor */
 .excelat-cell-editor {
   position: absolute;

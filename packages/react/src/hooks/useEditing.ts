@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react";
-import { CellValue, CellCoord } from "../model/types";
+import { CellValue, CellCoord, ColumnType } from "../model/types";
 import { GridOperation } from "../model/operations";
 
 export type EditMovement = "none" | "down" | "up" | "right" | "left";
@@ -11,9 +11,26 @@ export interface EditingState {
   initialValue: CellValue;
 }
 
-export function parseInputValue(input: string): CellValue {
+export function parseInputValue(input: string, columnType?: ColumnType): CellValue {
   const trimmed = input.trim();
   if (trimmed === "") return null;
+
+  if (columnType === "number") {
+    const num = Number(trimmed);
+    return !Number.isNaN(num) ? num : trimmed;
+  }
+
+  if (columnType === "boolean") {
+    if (trimmed.toLowerCase() === "true") return true;
+    if (trimmed.toLowerCase() === "false") return false;
+    return Boolean(trimmed);
+  }
+
+  if (columnType === "text") {
+    return input;
+  }
+
+  // General auto-coercion
   if (trimmed.toLowerCase() === "true") return true;
   if (trimmed.toLowerCase() === "false") return false;
   if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
@@ -27,7 +44,8 @@ export function useEditing(
   getCellValue: (row: number, col: number) => CellValue,
   executeOperation: (op: GridOperation) => void,
   onNavigateAfterCommit?: (movement: EditMovement) => void,
-  readOnly?: boolean
+  readOnly?: boolean,
+  getColumnType?: (colIndex: number) => ColumnType | undefined
 ) {
   const [editingState, setEditingState] = useState<EditingState>({
     isEditing: false,
@@ -50,7 +68,7 @@ export function useEditing(
         // User typed a printable character: replace existing value
         initialText = initialKey;
       } else {
-        // Double-click or F2 or Enter: start with existing value
+        // Double-click, F2, Enter, or formula bar click: start with existing value
         initialText = currentVal !== null && currentVal !== undefined ? String(currentVal) : "";
       }
 
@@ -68,12 +86,35 @@ export function useEditing(
     setEditingState((prev) => ({ ...prev, value: newValue }));
   }, []);
 
+  const startOrUpdateEdit = useCallback(
+    (coord: CellCoord, newValue: string) => {
+      if (readOnly) return;
+      setEditingState((prev) => {
+        if (!prev.isEditing || prev.coord.row !== coord.row || prev.coord.col !== coord.col) {
+          const currentVal = getCellValue(coord.row, coord.col);
+          return {
+            isEditing: true,
+            value: newValue,
+            coord,
+            initialValue: currentVal,
+          };
+        }
+        return {
+          ...prev,
+          value: newValue,
+        };
+      });
+    },
+    [getCellValue, readOnly]
+  );
+
   const commitEdit = useCallback(
     (movement: EditMovement = "none") => {
       const state = editingStateRef.current;
       if (!state.isEditing) return;
 
-      const parsed = parseInputValue(state.value);
+      const colType = getColumnType?.(state.coord.col);
+      const parsed = parseInputValue(state.value, colType);
       if (parsed !== state.initialValue) {
         executeOperation({
           type: "cell.update",
@@ -94,7 +135,7 @@ export function useEditing(
         onNavigateAfterCommit(movement);
       }
     },
-    [executeOperation, onNavigateAfterCommit]
+    [executeOperation, onNavigateAfterCommit, getColumnType]
   );
 
   const cancelEdit = useCallback(() => {
@@ -111,6 +152,7 @@ export function useEditing(
     editCoord: editingState.coord,
     startEditing,
     updateEditValue,
+    startOrUpdateEdit,
     commitEdit,
     cancelEdit,
   };

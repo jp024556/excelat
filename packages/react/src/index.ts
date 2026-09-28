@@ -9,12 +9,21 @@ export type {
   ExcelatMode,
   SelectionStyle,
   ExcelatColumn,
+  ColumnType,
+  CellRenderContext,
+  ContextMenuContext,
+  ExcelatRef,
 } from "./model/types";
 export type {
   GridOperation,
   CellUpdateOp,
   RangeClearOp,
   RangeUpdateOp,
+  RowInsertOp,
+  RowDeleteOp,
+  ColumnInsertOp,
+  ColumnDeleteOp,
+  RangeMoveOp,
 } from "./model/operations";
 export {
   applyOperation,

@@ -4,7 +4,7 @@ import { ColumnHeader } from "./ColumnHeader";
 import { RowHeader } from "./RowHeader";
 import { Cell } from "./Cell";
 import { EditMovement } from "../hooks/useEditing";
-import { getCellValue } from "../model/dataModel";
+import { getCellValue, isCellInRange } from "../model/dataModel";
 
 export interface GridProps {
   totalRows: number;
@@ -24,9 +24,14 @@ export interface GridProps {
   isEditing: boolean;
   editCoord: CellCoord;
   editValue: string;
+  fillTargetRange?: CellRange | null;
+  moveTargetRange?: CellRange | null;
   onMouseDownCell: (e: React.MouseEvent, row: number, col: number) => void;
   onMouseEnterCell: (row: number, col: number) => void;
   onDoubleClickCell: (row: number, col: number) => void;
+  onContextMenuCell?: (e: React.MouseEvent, row: number, col: number) => void;
+  onFillHandleMouseDown?: (e: React.MouseEvent) => void;
+  onRangeBorderMouseDown?: (e: React.MouseEvent) => void;
   onEditValueChange: (val: string) => void;
   onCommitEdit: (movement?: EditMovement) => void;
   onCancelEdit: () => void;
@@ -58,9 +63,14 @@ export const Grid: React.FC<GridProps> = ({
   isEditing,
   editCoord,
   editValue,
+  fillTargetRange,
+  moveTargetRange,
   onMouseDownCell,
   onMouseEnterCell,
   onDoubleClickCell,
+  onContextMenuCell,
+  onFillHandleMouseDown,
+  onRangeBorderMouseDown,
   onEditValueChange,
   onCommitEdit,
   onCancelEdit,
@@ -155,6 +165,14 @@ export const Grid: React.FC<GridProps> = ({
                   const isLeftEdge = isSelected && col === selectionRange.startColumn;
                   const isRightEdge = isSelected && col === selectionRange.endColumn;
 
+                  // Fill target & move target
+                  const isFillTarget =
+                    !!fillTargetRange &&
+                    isCellInRange(row, col, fillTargetRange) &&
+                    !isSelected;
+                  const isMoveTarget =
+                    !!moveTargetRange && isCellInRange(row, col, moveTargetRange);
+
                   return (
                     <Cell
                       key={col}
@@ -172,9 +190,15 @@ export const Grid: React.FC<GridProps> = ({
                       isBottomEdge={isBottomEdge}
                       isLeftEdge={isLeftEdge}
                       isRightEdge={isRightEdge}
+                      isFillTarget={isFillTarget}
+                      isMoveTarget={isMoveTarget}
+                      render={columns?.[col]?.render}
                       onMouseDown={onMouseDownCell}
                       onMouseEnter={onMouseEnterCell}
                       onDoubleClick={onDoubleClickCell}
+                      onContextMenu={onContextMenuCell}
+                      onFillHandleMouseDown={onFillHandleMouseDown}
+                      onRangeBorderMouseDown={onRangeBorderMouseDown}
                       onEditValueChange={onEditValueChange}
                       onCommitEdit={onCommitEdit}
                       onCancelEdit={onCancelEdit}

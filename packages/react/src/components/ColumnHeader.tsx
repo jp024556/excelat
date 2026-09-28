@@ -71,6 +71,7 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = React.memo(
                 maxWidth: `${width}px`,
               }}
               role="columnheader"
+              data-col={col}
               onClick={() => onSelectColumn?.(col)}
               title={label ? `Column: ${label}` : undefined}
             >

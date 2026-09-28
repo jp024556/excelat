@@ -1,13 +1,16 @@
-import React from "react";
+import React, { useRef } from "react";
 import { CellValue } from "../model/types";
+import { EditMovement } from "../hooks/useEditing";
 
 export interface FormulaBarProps {
   activeCoordText: string;
   activeValue: CellValue;
   isEditing: boolean;
   editValue: string;
-  onChangeEditValue?: (value: string) => void;
-  onCommit?: () => void;
+  onChange: (value: string) => void;
+  onCommit: (movement?: EditMovement) => void;
+  onCancel: () => void;
+  onFocus?: () => void;
 }
 
 export const FormulaBar: React.FC<FormulaBarProps> = ({
@@ -15,14 +18,33 @@ export const FormulaBar: React.FC<FormulaBarProps> = ({
   activeValue,
   isEditing,
   editValue,
-  onChangeEditValue,
+  onChange,
   onCommit,
+  onCancel,
+  onFocus,
 }) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const displayValue = isEditing
     ? editValue
     : activeValue !== null && activeValue !== undefined
     ? String(activeValue)
     : "";
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      onCommit(e.shiftKey ? "up" : "down");
+      return;
+    }
+
+    if (e.key === "Escape") {
+      e.preventDefault();
+      onCancel();
+      inputRef.current?.blur();
+      return;
+    }
+  };
 
   return (
     <div className="excelat-formula-bar" role="toolbar" aria-label="Formula Bar">
@@ -34,16 +56,13 @@ export const FormulaBar: React.FC<FormulaBarProps> = ({
       </div>
       <div className="excelat-formula-input-wrapper">
         <input
+          ref={inputRef}
           type="text"
           className="excelat-formula-input"
           value={displayValue}
-          onChange={(e) => onChangeEditValue?.(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              onCommit?.();
-            }
-          }}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={onFocus}
+          onKeyDown={handleKeyDown}
           placeholder="Enter a value..."
           aria-label="Cell formula input"
         />

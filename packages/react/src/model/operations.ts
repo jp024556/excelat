@@ -21,7 +21,47 @@ export type RangeUpdateOp = {
   values: CellValue[][];
 };
 
-export type GridOperation = CellUpdateOp | RangeClearOp | RangeUpdateOp;
+export type RowInsertOp = {
+  type: "row.insert";
+  rowIndex: number;
+  rows: CellValue[][];
+};
+
+export type RowDeleteOp = {
+  type: "row.delete";
+  rowIndex: number;
+  deletedRows: CellValue[][];
+};
+
+export type ColumnInsertOp = {
+  type: "column.insert";
+  columnIndex: number;
+  columnsData: CellValue[][];
+};
+
+export type ColumnDeleteOp = {
+  type: "column.delete";
+  columnIndex: number;
+  deletedColumnsData: CellValue[][];
+};
+
+export type RangeMoveOp = {
+  type: "range.move";
+  sourceRange: CellRange;
+  targetRange: CellRange;
+  movedValues: CellValue[][];
+  overwrittenValues: CellValue[][];
+};
+
+export type GridOperation =
+  | CellUpdateOp
+  | RangeClearOp
+  | RangeUpdateOp
+  | RowInsertOp
+  | RowDeleteOp
+  | ColumnInsertOp
+  | ColumnDeleteOp
+  | RangeMoveOp;
 
 /**
  * Creates an empty matrix filled with null values for a given range.
@@ -64,12 +104,44 @@ export function invertOperation(op: GridOperation): GridOperation {
         previousValues: op.values,
         values: op.previousValues,
       };
+    case "row.insert":
+      return {
+        type: "row.delete",
+        rowIndex: op.rowIndex,
+        deletedRows: op.rows,
+      };
+    case "row.delete":
+      return {
+        type: "row.insert",
+        rowIndex: op.rowIndex,
+        rows: op.deletedRows,
+      };
+    case "column.insert":
+      return {
+        type: "column.delete",
+        columnIndex: op.columnIndex,
+        deletedColumnsData: op.columnsData,
+      };
+    case "column.delete":
+      return {
+        type: "column.insert",
+        columnIndex: op.columnIndex,
+        columnsData: op.deletedColumnsData,
+      };
+    case "range.move":
+      return {
+        type: "range.move",
+        sourceRange: op.targetRange,
+        targetRange: op.sourceRange,
+        movedValues: op.movedValues,
+        overwrittenValues: op.overwrittenValues,
+      };
   }
 }
 
 /**
  * Applies a GridOperation to a 2D data matrix immutably,
- * copying only the affected rows to avoid cloning the entire grid.
+ * copying only the affected rows to avoid cloning the entire grid unnecessarily.
  */
 export function applyOperation(data: ExcelatData, op: GridOperation): ExcelatData {
   switch (op.type) {
@@ -148,6 +220,67 @@ export function applyOperation(data: ExcelatData, op: GridOperation): ExcelatDat
           nextData[r] = data[r] || [];
         }
       }
+      return nextData;
+    }
+
+    case "row.insert": {
+      const { rowIndex, rows } = op;
+      const nextData = [...data];
+      nextData.splice(rowIndex, 0, ...rows.map((r) => [...r]));
+      return nextData;
+    }
+
+    case "row.delete": {
+      const { rowIndex, deletedRows } = op;
+      const nextData = [...data];
+      nextData.splice(rowIndex, deletedRows.length);
+      return nextData;
+    }
+
+    case "column.insert": {
+      const { columnIndex, columnsData } = op;
+      const maxRows = Math.max(data.length, columnsData.length);
+      const nextData: ExcelatData = new Array(maxRows);
+
+      for (let r = 0; r < maxRows; r++) {
+        const originalRow = data[r] ? [...data[r]] : [];
+        const toInsert = columnsData[r] || [null];
+        originalRow.splice(columnIndex, 0, ...toInsert);
+        nextData[r] = originalRow;
+      }
+      return nextData;
+    }
+
+    case "column.delete": {
+      const { columnIndex, deletedColumnsData } = op;
+      const nextData: ExcelatData = new Array(data.length);
+
+      for (let r = 0; r < data.length; r++) {
+        const originalRow = data[r] ? [...data[r]] : [];
+        const count = deletedColumnsData[r]?.length || 1;
+        originalRow.splice(columnIndex, count);
+        nextData[r] = originalRow;
+      }
+      return nextData;
+    }
+
+    case "range.move": {
+      // 1. Clear source range
+      let nextData = applyOperation(data, {
+        type: "range.clear",
+        range: op.sourceRange,
+        previousValues: op.movedValues,
+      });
+
+      // 2. If undoing: write overwrittenValues to target, then write movedValues to source
+      // If forward: write movedValues to target
+      nextData = applyOperation(nextData, {
+        type: "range.update",
+        range: op.targetRange,
+        previousValues: op.overwrittenValues,
+        values: op.movedValues,
+      });
+
       return nextData;
     }
   }

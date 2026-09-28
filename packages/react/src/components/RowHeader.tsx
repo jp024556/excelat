@@ -16,6 +16,7 @@ export const RowHeader: React.FC<RowHeaderProps> = React.memo(
         className={`excelat-row-header ${isSelected ? "excelat-header-selected" : ""}`}
         style={height ? { height: `${height}px` } : undefined}
         role="rowheader"
+        data-row={rowIndex}
         onClick={() => onSelectRow?.(rowIndex)}
         title={`Row ${getRowLabel(rowIndex)}`}
       >
