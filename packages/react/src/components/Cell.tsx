@@ -1,5 +1,5 @@
 import React from "react";
-import { CellValue } from "../model/types";
+import { CellValue, SelectionStyle } from "../model/types";
 import { CellEditor } from "./CellEditor";
 import { EditMovement } from "../hooks/useEditing";
 
@@ -10,6 +10,9 @@ export interface CellProps {
   isActive: boolean;
   isSelected: boolean;
   isEditing: boolean;
+  selectionStyle?: SelectionStyle;
+  width?: number;
+  height?: number;
   editValue?: string;
   isTopEdge?: boolean;
   isBottomEdge?: boolean;
@@ -31,6 +34,9 @@ export const Cell: React.FC<CellProps> = React.memo(
     isActive,
     isSelected,
     isEditing,
+    selectionStyle = "excel",
+    width,
+    height,
     editValue = "",
     isTopEdge,
     isBottomEdge,
@@ -62,20 +68,36 @@ export const Cell: React.FC<CellProps> = React.memo(
     const classNames = [
       "excelat-cell",
       `excelat-cell-${cellType}`,
-      isSelected ? "excelat-cell-selected" : "",
-      isActive ? "excelat-cell-active" : "",
       isEditing ? "excelat-cell-editing" : "",
-      isTopEdge ? "excelat-border-top" : "",
-      isBottomEdge ? "excelat-border-bottom" : "",
-      isLeftEdge ? "excelat-border-left" : "",
-      isRightEdge ? "excelat-border-right" : "",
-    ]
-      .filter(Boolean)
-      .join(" ");
+    ];
+
+    if (selectionStyle === "excel") {
+      if (isSelected) classNames.push("excelat-cell-selected");
+      if (isActive) classNames.push("excelat-cell-active");
+      if (isTopEdge) classNames.push("excelat-border-top");
+      if (isBottomEdge) classNames.push("excelat-border-bottom");
+      if (isLeftEdge) classNames.push("excelat-border-left");
+      if (isRightEdge) classNames.push("excelat-border-right");
+    } else if (selectionStyle === "subtle") {
+      if (isSelected) classNames.push("excelat-cell-subtle-selected");
+      if (isActive) classNames.push("excelat-cell-subtle-active");
+    }
+    // If selectionStyle === "none", no visual selection classes added
+
+    const style: React.CSSProperties = {};
+    if (width !== undefined) {
+      style.width = `${width}px`;
+      style.minWidth = `${width}px`;
+      style.maxWidth = `${width}px`;
+    }
+    if (height !== undefined) {
+      style.height = `${height}px`;
+    }
 
     return (
       <td
-        className={classNames}
+        className={classNames.filter(Boolean).join(" ")}
+        style={Object.keys(style).length > 0 ? style : undefined}
         role="gridcell"
         aria-selected={isSelected}
         data-row={row}
@@ -96,8 +118,10 @@ export const Cell: React.FC<CellProps> = React.memo(
             {formattedText}
           </div>
         )}
-        {/* Fill handle in active cell bottom-right corner when selected */}
-        {isActive && !isEditing && <div className="excelat-cell-handle" />}
+        {/* Fill handle in active cell bottom-right corner only in excel selection style */}
+        {selectionStyle === "excel" && isActive && !isEditing && (
+          <div className="excelat-cell-handle" />
+        )}
       </td>
     );
   }

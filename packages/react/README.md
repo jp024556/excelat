@@ -42,7 +42,9 @@ import "@excelat/react/dist/style.css";
 
 ## 2. Quick start
 
-Excelat works out of the box with minimal configuration:
+### Spreadsheet Mode (Default)
+
+Excel-like interface with row numbers, column letters, and Excel-style focus:
 
 ```tsx
 import { Excelat } from "@excelat/react";
@@ -66,17 +68,46 @@ export default function Demo() {
 }
 ```
 
+### Table Mode (Application Table)
+
+Visually looks like a normal application table while retaining full spreadsheet interactions (keyboard navigation, range selection, inline editing, copy/paste, undo/redo):
+
+```tsx
+import { Excelat } from "@excelat/react";
+import "@excelat/react/dist/style.css";
+
+const data = [
+  ["Jay", 30, "Bangalore"],
+  ["Rahul", 28, "Delhi"],
+];
+
+export default function TableDemo() {
+  return (
+    <Excelat
+      data={data}
+      mode="table"
+      columns={[
+        { header: "Name", width: 120 },
+        { header: "Age", width: 80 },
+        { header: "City", width: 140 },
+      ]}
+    />
+  );
+}
+```
+
 ---
 
 ## 3. Features
 
-* **Excel-like Interaction**: Native spreadsheet feeling, not just an HTML table.
+* **Visual Modes**: Choose between `"spreadsheet"` (Excel-like UI) and `"table"` (clean web application table).
+* **Configurable Selection**: Choose between `"excel"` (prominent green border & drag handle), `"subtle"` (minimal blue border, no handle), and `"none"`.
+* **Column & Row Resizing**: Drag column and row header boundaries to resize; double-click column boundary to auto-fit.
 * **Cell Selection & Range Selection**: Mouse drag selection and Shift + Arrow selection.
-* **Inline Cell Editing**: Double-click or type directly to replace value.
+* **Inline Cell Editing**: Double-click or type directly to replace value. Enter/Tab commits, Escape cancels.
 * **Clipboard Support**: Copy, Cut, Paste using standard Tab-Separated Values (TSV) compatible with Excel & Google Sheets.
-* **Undo / Redo**: Multi-step history stack powered by an operation model.
-* **Fast & Lightweight**: Zero external grid dependencies. Memoized cell rendering.
-* **Extensible Architecture**: Operation-based model designed for future collaboration, formulas, and virtualization.
+* **Undo / Redo**: Multi-step history stack powered by an operation model (`Ctrl+Z`, `Ctrl+Y`).
+* **Fast & Lightweight**: Zero external grid dependencies. Built from scratch with React and pure vanilla CSS.
 
 ---
 
@@ -141,10 +172,17 @@ function ControlledSheet() {
 | Prop | Type | Default | Description |
 | --- | --- | --- | --- |
 | `data` | `CellValue[][]` | `[]` | 2D matrix of cell values (`string \| number \| boolean \| null`). |
+| `mode` | `"spreadsheet" \| "table"` | `"spreadsheet"` | Visual mode. In `"table"` mode, row numbers and column letters are hidden by default. |
+| `columns` | `number \| ExcelatColumn[]` | `26` | Number of columns or array of column definitions (`{ header?: string, width?: number }`). |
 | `rows` | `number` | `100` | Initial number of rows to render. |
-| `columns` | `number` | `26` | Initial number of columns to render (A–Z). |
+| `selectionStyle` | `"excel" \| "subtle" \| "none"` | `"excel"` (or `"subtle"` in table mode) | Visual treatment for active and selected cells. |
+| `showRowNumbers` | `boolean` | `true` (false in table mode) | Whether to display row numbers (1, 2, 3...). |
+| `showColumnLetters` | `boolean` | `true` (false in table mode) | Whether to display column letters (A, B, C...). |
+| `showFormulaBar` | `boolean` | `false` | Whether to display the top formula/coordinate bar. |
 | `onChange` | `(nextData: ExcelatData) => void` | `undefined` | Callback invoked when data changes. |
 | `onSelectionChange` | `(selection: CellRange) => void` | `undefined` | Callback invoked when selected range changes. |
+| `onColumnResize` | `(colIndex: number, width: number) => void` | `undefined` | Callback invoked when a column is resized. |
+| `onRowResize` | `(rowIndex: number, height: number) => void` | `undefined` | Callback invoked when a row is resized. |
 | `readOnly` | `boolean` | `false` | When true, disables editing, cut, paste, and deletion. |
 | `className` | `string` | `""` | Optional CSS class name for root container. |
 | `style` | `React.CSSProperties` | `undefined` | Optional inline styles for root container. |
@@ -154,6 +192,13 @@ function ControlledSheet() {
 ```ts
 export type CellValue = string | number | boolean | null;
 export type ExcelatData = CellValue[][];
+export type ExcelatMode = "table" | "spreadsheet";
+export type SelectionStyle = "excel" | "subtle" | "none";
+
+export interface ExcelatColumn {
+  header?: string;
+  width?: number;
+}
 
 export interface CellRange {
   startRow: number;
@@ -172,29 +217,17 @@ Excelat separates concerns cleanly:
 ```text
 Excelat
 │
-├── Grid                # Table layout, sticky headers, viewport
-├── Cell                # Memoized cell display and type formatting
-├── RowHeader           # Row numbers and selection highlight
-├── ColumnHeader        # Column letters (A..Z, AA..) and selection highlight
+├── Grid                # Table layout, sticky headers, viewport, mode styles
+├── Cell                # Memoized cell display, selection styles, alignment
+├── RowHeader           # Row numbers, selection highlight, row resizing
+├── ColumnHeader        # Column headers/letters, selection highlight, col resizing
+├── FormulaBar          # Optional formula bar with active coordinate & value input
 ├── Selection           # Normalized rectangular range state (anchor & focus)
 ├── Editing             # CellEditor input lifecycle and commit navigation
 ├── Keyboard            # Keyboard shortcuts and spreadsheet navigation
 ├── Clipboard          # TSV serialization, deserialization, clipboard API
 └── History             # Operation stack (undo/redo) with structural sharing
 ```
-
-### Operation Model
-
-All mutations are represented as reversible atomic operations:
-
-```ts
-type GridOperation =
-  | { type: "cell.update"; row: number; column: number; previousValue: CellValue; value: CellValue }
-  | { type: "range.clear"; range: CellRange; previousValues: CellValue[][] }
-  | { type: "range.update"; range: CellRange; previousValues: CellValue[][]; values: CellValue[][] };
-```
-
-This ensures fast undo/redo without duplicating entire datasets in memory.
 
 ---
 
@@ -203,6 +236,10 @@ This ensures fast undo/redo without duplicating entire datasets in memory.
 ```text
 V0.1
 ✓ Excel-like grid
+✓ Optional Excel UI (Table mode vs Spreadsheet mode)
+✓ Configurable selection UI (Excel, Subtle, None)
+✓ Column and row resizing
+✓ Normal table headers
 ✓ Cell editing
 ✓ Keyboard navigation
 ✓ Range selection

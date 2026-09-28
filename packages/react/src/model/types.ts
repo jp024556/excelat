@@ -16,6 +16,15 @@ export interface CellRange {
   endColumn: number; // 0-based
 }
 
+export type ExcelatMode = "table" | "spreadsheet";
+
+export type SelectionStyle = "excel" | "subtle" | "none";
+
+export interface ExcelatColumn {
+  header?: string;
+  width?: number;
+}
+
 export interface ExcelatProps {
   /**
    * 2D array of cell values.
@@ -28,11 +37,37 @@ export interface ExcelatProps {
    */
   rows?: number;
   /**
-   * Total number of columns to render.
+   * Total number of columns to render, or an array of column definitions.
    * If data has more columns, the larger number is used.
    * Default is 26 (A-Z) or max columns in data.
    */
-  columns?: number;
+  columns?: number | ExcelatColumn[];
+  /**
+   * Visual mode: "spreadsheet" (Excel-like UI) or "table" (clean application table appearance).
+   * Default is "spreadsheet".
+   */
+  mode?: ExcelatMode;
+  /**
+   * Selection visual treatment: "excel" (prominent green border & fill handle),
+   * "subtle" (minimal border, no handle), or "none" (no visual selection box).
+   * In spreadsheet mode defaults to "excel", in table mode defaults to "subtle".
+   */
+  selectionStyle?: SelectionStyle;
+  /**
+   * Whether to show row numbers (1, 2, 3...).
+   * In spreadsheet mode defaults to true, in table mode defaults to false.
+   */
+  showRowNumbers?: boolean;
+  /**
+   * Whether to show column letters (A, B, C...).
+   * In spreadsheet mode defaults to true, in table mode defaults to false.
+   */
+  showColumnLetters?: boolean;
+  /**
+   * Whether to show the top formula/coordinate bar.
+   * Default is false.
+   */
+  showFormulaBar?: boolean;
   /**
    * Callback fired when data changes (via edit, paste, delete, undo, redo).
    */
@@ -41,6 +76,14 @@ export interface ExcelatProps {
    * Callback fired when selection changes.
    */
   onSelectionChange?: (selection: CellRange) => void;
+  /**
+   * Callback fired when a column is resized.
+   */
+  onColumnResize?: (columnIndex: number, width: number) => void;
+  /**
+   * Callback fired when a row is resized.
+   */
+  onRowResize?: (rowIndex: number, height: number) => void;
   /**
    * Optional custom class name for the root container.
    */

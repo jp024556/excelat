@@ -6,6 +6,9 @@ export type {
   CellCoord,
   CellRange,
   ExcelatProps,
+  ExcelatMode,
+  SelectionStyle,
+  ExcelatColumn,
 } from "./model/types";
 export type {
   GridOperation,
@@ -34,5 +37,6 @@ export { Cell } from "./components/Cell";
 export { ColumnHeader } from "./components/ColumnHeader";
 export { RowHeader } from "./components/RowHeader";
 export { CellEditor } from "./components/CellEditor";
+export { FormulaBar } from "./components/FormulaBar";
 
 export default Excelat;
