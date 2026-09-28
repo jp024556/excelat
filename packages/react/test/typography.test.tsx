@@ -1,8 +1,7 @@
-import React from "react";
 import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
-import fs from "fs";
-import path from "path";
+import fs from "node:fs";
+import path from "node:path";
 import { Excelat } from "../src/Excelat";
 import type { ExcelatProps } from "../src/model/types";
 

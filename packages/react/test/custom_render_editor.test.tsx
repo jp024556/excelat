@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React from "react";
 import { describe, it, expect, vi } from "vitest";
-import { render, fireEvent, act } from "@testing-library/react";
+import { render, fireEvent } from "@testing-library/react";
 import {
   Excelat,
   ExcelatData,
@@ -211,7 +211,6 @@ describe("Excelat - Custom Cell Types, Rendering & Editing", () => {
 
     it("supports direct value commit via onCommit(movement, directValue)", () => {
       const QuickToggleEditor: React.FC<CustomCellEditorProps> = ({
-        value,
         onCommit,
         onCancel,
       }) => {

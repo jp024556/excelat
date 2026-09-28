@@ -1,4 +1,3 @@
-import React from "react";
 import { describe, it, expect } from "vitest";
 import { render, fireEvent } from "@testing-library/react";
 import { Excelat } from "../src/Excelat";
