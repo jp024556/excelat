@@ -1,4 +1,4 @@
-import { CellValue, CellRange, ExcelatData } from "./types";
+import { CellValue, CellRange, ExcelatData, ExcelatColumn } from "./types";
 
 export type CellUpdateOp = {
   type: "cell.update";
@@ -102,6 +102,90 @@ export function computeReorderTarget(
   } else {
     return position === "before" ? toIdx : toIdx + 1;
   }
+}
+
+/**
+ * Reorders columns and row data according to a target column order (list of keys, headers, or indices).
+ */
+export function reorderColumnsAndData(
+  columns: ExcelatColumn[] | undefined,
+  data: ExcelatData,
+  targetOrder: string[]
+): {
+  columns?: ExcelatColumn[];
+  data: ExcelatData;
+  oldToNew: number[];
+  newToOld: number[];
+} {
+  const totalCols = columns
+    ? columns.length
+    : data.reduce((max, r) => Math.max(max, r ? r.length : 0), 0);
+  if (totalCols === 0 || !targetOrder || targetOrder.length === 0) {
+    return {
+      columns,
+      data,
+      oldToNew: Array.from({ length: totalCols }, (_, i) => i),
+      newToOld: Array.from({ length: totalCols }, (_, i) => i),
+    };
+  }
+
+  // Find index for each column identifier in targetOrder
+  const usedIndices = new Set<number>();
+  const newToOld: number[] = [];
+
+  for (const identifier of targetOrder) {
+    let matchIdx = -1;
+    if (columns) {
+      matchIdx = columns.findIndex(
+        (c, idx) =>
+          !usedIndices.has(idx) &&
+          (c.key === identifier ||
+            (c.header && c.header.toLowerCase() === identifier.toLowerCase()) ||
+            (c.label && c.label.toLowerCase() === identifier.toLowerCase()) ||
+            String(idx) === identifier)
+      );
+    } else {
+      const parsed = parseInt(identifier, 10);
+      if (!isNaN(parsed) && parsed >= 0 && parsed < totalCols && !usedIndices.has(parsed)) {
+        matchIdx = parsed;
+      }
+    }
+
+    if (matchIdx !== -1) {
+      newToOld.push(matchIdx);
+      usedIndices.add(matchIdx);
+    }
+  }
+
+  // Append any columns not mentioned in targetOrder
+  for (let i = 0; i < totalCols; i++) {
+    if (!usedIndices.has(i)) {
+      newToOld.push(i);
+      usedIndices.add(i);
+    }
+  }
+
+  // Compute inverse mapping oldToNew
+  const oldToNew = new Array(totalCols);
+  newToOld.forEach((oldIdx, newIdx) => {
+    oldToNew[oldIdx] = newIdx;
+  });
+
+  // Reorder columns
+  const nextColumns = columns ? newToOld.map((oldIdx) => columns[oldIdx]) : undefined;
+
+  // Reorder row data
+  const nextData = data.map((row) => {
+    if (!row) return row;
+    return newToOld.map((oldIdx) => (oldIdx < row.length ? row[oldIdx] : null));
+  });
+
+  return {
+    columns: nextColumns,
+    data: nextData,
+    oldToNew,
+    newToOld,
+  };
 }
 
 /**

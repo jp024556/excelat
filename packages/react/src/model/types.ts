@@ -269,12 +269,57 @@ export interface VirtualizationConfig {
   colOverscan?: number;
 }
 
+/**
+ * Serializable snapshot of the grid layout and interactive state.
+ * Can be saved to localStorage or a database to restore state on mount.
+ */
+export interface ExcelatGridState {
+  /**
+   * Ordered list of column keys (or headers/indices if keys are omitted).
+   */
+  columnOrder?: string[];
+
+  /**
+   * Column widths mapping (by column key, header, or numeric index).
+   */
+  columnWidths?: Record<string | number, number>;
+
+  /**
+   * Active sort rules.
+   */
+  sorting?: SortRule[];
+
+  /**
+   * Active column filters.
+   */
+  filtering?: Filter[];
+
+  /**
+   * Grouping configuration (columns and expanded state).
+   */
+  grouping?: {
+    columns?: (string | number)[];
+    expanded?: Record<string, boolean>;
+  };
+
+  /**
+   * Pagination state (current page and page size).
+   */
+  pagination?: {
+    page?: number;
+    pageSize?: number;
+  };
+}
+
 export interface ExcelatRef {
   insertRow: (index?: number, values?: CellValue[]) => void;
   deleteRow: (index?: number) => void;
   insertColumn: (index?: number, values?: CellValue[]) => void;
   deleteColumn: (index?: number) => void;
   reorderColumn: (fromIndex: number, toIndex: number) => void;
+  getState: () => ExcelatGridState;
+  setState: (state: Partial<ExcelatGridState>) => void;
+  resetState: () => void;
   undo: () => void;
   redo: () => void;
   copy: () => Promise<string | undefined>;
@@ -430,6 +475,15 @@ export interface ExcelatProps {
    * Optional custom style for the root container.
    */
   style?: React.CSSProperties;
+  /**
+   * Initial state configuration to restore on mount (column order, widths, sorting, filtering, etc.).
+   */
+  initialState?: ExcelatGridState;
+  /**
+   * Callback fired whenever the serializable grid state changes.
+   * Ideal for persisting layout to localStorage or backend settings.
+   */
+  onStateChange?: (state: ExcelatGridState) => void;
   /**
    * Whether the grid is read-only.
    */

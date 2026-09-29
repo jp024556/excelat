@@ -7,6 +7,7 @@ import {
   SelectionStyle,
   ExcelatColumn,
   ExcelatRef,
+  ExcelatGridState,
   ExcelatOperation,
   SortRule,
   Filter,
@@ -34,6 +35,7 @@ import {
   ArrowUpDown,
   Filter as FilterIcon,
   FolderTree,
+  BookmarkCheck,
 } from "lucide-react";
 import "./App.css";
 
@@ -296,6 +298,60 @@ export function App() {
       { id: Date.now() + Math.random(), time: timestamp, op },
       ...prev.slice(0, 24),
     ]);
+  }, []);
+
+  // Layout Persistence & Saved Views State
+  const [statusToast, setStatusToast] = useState<string | null>(null);
+
+  const handleSaveLayout = useCallback(() => {
+    const state = gridRef.current?.getState();
+    if (state) {
+      localStorage.setItem("excelat_demo_layout", JSON.stringify(state));
+      setStatusToast("Layout saved to localStorage!");
+      setTimeout(() => setStatusToast(null), 3500);
+    }
+  }, []);
+
+  const handleRestoreLayout = useCallback(() => {
+    const raw = localStorage.getItem("excelat_demo_layout");
+    if (raw) {
+      try {
+        const state: ExcelatGridState = JSON.parse(raw);
+        gridRef.current?.setState(state);
+        setStatusToast("Layout restored from localStorage!");
+        setTimeout(() => setStatusToast(null), 3500);
+      } catch {
+        setStatusToast("Failed to parse saved layout.");
+        setTimeout(() => setStatusToast(null), 3500);
+      }
+    } else {
+      setStatusToast("No saved layout found in localStorage.");
+      setTimeout(() => setStatusToast(null), 3500);
+    }
+  }, []);
+
+  const handleResetLayout = useCallback(() => {
+    gridRef.current?.resetState();
+    setStatusToast("Layout reset to default.");
+    setTimeout(() => setStatusToast(null), 3500);
+  }, []);
+
+  const handleApplyPreset = useCallback((preset: "salary" | "hr") => {
+    if (preset === "salary") {
+      gridRef.current?.setState({
+        columnOrder: ["salary", "status", "name", "department", "city", "age", "joinDate"],
+        sorting: [{ column: "salary", direction: "desc" }],
+      });
+      setStatusToast("Applied 'Salary Leaderboard' view preset!");
+    } else if (preset === "hr") {
+      gridRef.current?.setState({
+        columnOrder: ["department", "name", "joinDate", "status", "salary", "city", "age"],
+        grouping: { columns: ["department"] },
+        sorting: [{ column: "name", direction: "asc" }],
+      });
+      setStatusToast("Applied 'HR & Department' view preset!");
+    }
+    setTimeout(() => setStatusToast(null), 3500);
   }, []);
 
   // Close context menu on outside click
@@ -614,6 +670,51 @@ export function App() {
               <span>Client Pagination</span>
             </label>
           )}
+        </div>
+
+        {/* State Persistence & Saved Views */}
+        <div className="control-group">
+          <div className="control-label">
+            <BookmarkCheck size={15} />
+            <span>Saved Views</span>
+          </div>
+          <div className="selection-style-group" style={{ flexWrap: "wrap", gap: "6px" }}>
+            <button
+              className="style-btn"
+              onClick={handleSaveLayout}
+              title="Save current column order, widths, sort & filters to localStorage"
+            >
+              Save View
+            </button>
+            <button
+              className="style-btn"
+              onClick={handleRestoreLayout}
+              title="Restore saved view from localStorage"
+            >
+              Restore View
+            </button>
+            <button
+              className="style-btn"
+              onClick={handleResetLayout}
+              title="Reset layout to default configuration"
+            >
+              Reset Layout
+            </button>
+            <button
+              className="style-btn"
+              onClick={() => handleApplyPreset("salary")}
+              title="Load 'Salary Leaderboard' preset"
+            >
+              Preset: Salary
+            </button>
+            <button
+              className="style-btn"
+              onClick={() => handleApplyPreset("hr")}
+              title="Load 'HR & Dept' preset"
+            >
+              Preset: HR
+            </button>
+          </div>
         </div>
       </section>
 
@@ -1161,6 +1262,32 @@ export function App() {
           </div>
         </section>
       </main>
+
+      {statusToast && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: "24px",
+            right: "24px",
+            background: "#0f172a",
+            color: "#f8fafc",
+            padding: "10px 18px",
+            borderRadius: "8px",
+            boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.3)",
+            fontSize: "13px",
+            fontWeight: 500,
+            zIndex: 99999,
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            border: "1px solid rgba(255, 255, 255, 0.1)",
+            animation: "fadeIn 0.2s ease-in-out",
+          }}
+        >
+          <BookmarkCheck size={16} color="#38bdf8" />
+          <span>{statusToast}</span>
+        </div>
+      )}
     </div>
   );
 }

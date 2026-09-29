@@ -13,6 +13,7 @@ import {
   ExcelatColumn,
   SelectionStyle,
   ExcelatRef,
+  ExcelatGridState,
   CellCoord,
   CellRange,
   CellValue,
@@ -49,6 +50,7 @@ import {
   RangeUpdateOp,
   createNullMatrix,
   reorderArray,
+  reorderColumnsAndData,
 } from "./model/operations";
 import { sortIndexedRows, cycleSortRule, resolveColumnIndex } from "./model/sorting";
 import { filterIndexedRows } from "./model/filtering";
@@ -88,6 +90,8 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
       onRowResize,
       columnReorder = true,
       onColumnReorder,
+      initialState,
+      onStateChange,
       onContextMenu,
       className = "",
       style,
@@ -108,9 +112,15 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
         ? "subtle"
         : "excel";
 
-    // Internal column definitions state (for reordering or local updates)
+    // Internal column definitions state (for reordering, state persistence, or local updates)
     const [internalColumns, setInternalColumns] = useState<ExcelatColumn[] | undefined>(
-      () => (Array.isArray(initialCols) ? initialCols : undefined)
+      () => {
+        const cols = Array.isArray(initialCols) ? initialCols : undefined;
+        if (cols && initialState?.columnOrder && initialState.columnOrder.length > 0) {
+          return reorderColumnsAndData(cols, [], initialState.columnOrder).columns;
+        }
+        return cols;
+      }
     );
     const [prevInitialCols, setPrevInitialCols] = useState(initialCols);
     if (initialCols !== prevInitialCols) {
@@ -121,9 +131,16 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
     const columnDefs = internalColumns;
     const propColsCount = typeof initialCols === "number" ? initialCols : undefined;
 
-    // Internal data state (for uncontrolled or local mutations)
+    // Internal data state (for uncontrolled, state persistence, or local mutations)
     const [internalData, setInternalData] = useState<ExcelatData>(
-      () => controlledData || []
+      () => {
+        const initial = controlledData || [];
+        const cols = Array.isArray(initialCols) ? initialCols : undefined;
+        if (cols && initialState?.columnOrder && initialState.columnOrder.length > 0 && initial.length > 0) {
+          return reorderColumnsAndData(cols, initial, initialState.columnOrder).data;
+        }
+        return initial;
+      }
     );
     const [prevControlledData, setPrevControlledData] = useState(controlledData);
 
@@ -152,9 +169,29 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
     const [columnWidths, setColumnWidths] = useState<Record<number, number>>(
       () => {
         const initial: Record<number, number> = {};
-        if (columnDefs) {
-          columnDefs.forEach((col, idx) => {
+        const cols = Array.isArray(initialCols) ? initialCols : undefined;
+        const effectiveCols =
+          cols && initialState?.columnOrder && initialState.columnOrder.length > 0
+            ? reorderColumnsAndData(cols, [], initialState.columnOrder).columns
+            : cols;
+
+        if (effectiveCols) {
+          effectiveCols.forEach((col, idx) => {
             if (col.width !== undefined) initial[idx] = col.width;
+          });
+        }
+
+        if (initialState?.columnWidths) {
+          Object.entries(initialState.columnWidths).forEach(([k, w]) => {
+            const num = parseInt(k, 10);
+            if (!isNaN(num) && String(num) === k) {
+              initial[num] = w;
+            } else if (effectiveCols) {
+              const matchIdx = effectiveCols.findIndex(
+                (c) => c.key === k || c.header === k || c.label === k
+              );
+              if (matchIdx !== -1) initial[matchIdx] = w;
+            }
           });
         }
         return initial;
@@ -185,7 +222,7 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
       typeof sorting === "object" ? sorting : undefined;
 
     const [internalSortRules, setInternalSortRules] = useState<SortRule[]>(
-      () => sortingConfig?.sort || []
+      () => initialState?.sorting || sortingConfig?.sort || []
     );
     useEffect(() => {
       if (sortingConfig?.sort !== undefined) {
@@ -216,7 +253,7 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
       typeof filtering === "object" ? filtering : undefined;
 
     const [internalFilters, setInternalFilters] = useState<Filter[]>(
-      () => filteringConfig?.filters || []
+      () => initialState?.filtering || filteringConfig?.filters || []
     );
     useEffect(() => {
       if (filteringConfig?.filters !== undefined) {
@@ -264,8 +301,20 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
     // -------------------------------------------------------------------------
     // Grouping State & Handlers
     // -------------------------------------------------------------------------
+    const [internalGroupColumns, setInternalGroupColumns] = useState<(string | number)[] | undefined>(
+      () => initialState?.grouping?.columns ?? grouping?.columns
+    );
+    useEffect(() => {
+      if (grouping?.columns !== undefined) {
+        setInternalGroupColumns(grouping.columns);
+      }
+    }, [grouping?.columns]);
+
+    const activeGroupColumns =
+      grouping?.columns !== undefined ? grouping.columns : internalGroupColumns;
+
     const [internalExpanded, setInternalExpanded] = useState<Record<string, boolean>>(
-      () => grouping?.expanded || {}
+      () => initialState?.grouping?.expanded || grouping?.expanded || {}
     );
     useEffect(() => {
       if (grouping?.expanded !== undefined) {
@@ -319,12 +368,12 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
     }, [filteredRows, isSortingEnabled, sortingConfig?.mode, activeSortRules, columnDefs]);
 
     const groupedDisplayRows: GridDisplayRow[] = useMemo(() => {
-      if (grouping?.columns && grouping.columns.length > 0) {
+      if (activeGroupColumns && activeGroupColumns.length > 0) {
         return buildGroupedDisplayRows(
           sortedRows,
-          grouping.columns,
+          activeGroupColumns,
           activeExpanded,
-          grouping.defaultExpanded !== false,
+          grouping?.defaultExpanded !== false,
           columnDefs
         );
       }
@@ -334,7 +383,7 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
         row: item.row,
         depth: 0,
       }));
-    }, [sortedRows, grouping?.columns, activeExpanded, grouping?.defaultExpanded, columnDefs]);
+    }, [sortedRows, activeGroupColumns, activeExpanded, grouping?.defaultExpanded, columnDefs]);
 
     const isClientPagination = pagination?.mode === "client";
     const displayRows: GridDisplayRow[] = useMemo(() => {
@@ -695,6 +744,199 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
       [readOnly, totalCols, internalColumns, executeOperation, onColumnReorder]
     );
 
+    // State Persistence (getState, setState, resetState, onStateChange)
+    const getState = useCallback((): ExcelatGridState => {
+      const columnOrder = internalColumns
+        ? internalColumns.map((c, i) => c.key || c.header || c.label || String(i))
+        : Array.from({ length: totalCols }, (_, i) => String(i));
+
+      const widths: Record<string | number, number> = {};
+      Object.entries(columnWidths).forEach(([idxStr, w]) => {
+        const idx = parseInt(idxStr, 10);
+        const colKey = internalColumns?.[idx]?.key;
+        if (colKey) {
+          widths[colKey] = w;
+        }
+        widths[idx] = w;
+      });
+
+      return {
+        columnOrder,
+        columnWidths: Object.keys(widths).length > 0 ? widths : undefined,
+        sorting: activeSortRules.length > 0 ? [...activeSortRules] : undefined,
+        filtering: activeFilters.length > 0 ? [...activeFilters] : undefined,
+        grouping:
+          (activeGroupColumns && activeGroupColumns.length > 0) ||
+          Object.keys(activeExpanded).length > 0
+            ? {
+                columns: activeGroupColumns ? [...activeGroupColumns] : undefined,
+                expanded: { ...activeExpanded },
+              }
+            : undefined,
+        pagination: pagination
+          ? {
+              page: pagination.page,
+              pageSize: pagination.pageSize,
+            }
+          : undefined,
+      };
+    }, [
+      internalColumns,
+      totalCols,
+      columnWidths,
+      activeSortRules,
+      activeFilters,
+      activeGroupColumns,
+      activeExpanded,
+      pagination,
+    ]);
+
+    const setState = useCallback(
+      (nextState: Partial<ExcelatGridState>) => {
+        // 1. Column Order
+        if (nextState.columnOrder && nextState.columnOrder.length > 0) {
+          const currentCols = internalColumns ?? (Array.isArray(initialCols) ? initialCols : undefined);
+          const res = reorderColumnsAndData(currentCols, currentData, nextState.columnOrder);
+          if (res.columns) {
+            setInternalColumns(res.columns);
+          }
+          setData(() => res.data);
+          if (!nextState.columnWidths) {
+            setColumnWidths((prev) => {
+              const next: Record<number, number> = {};
+              res.newToOld.forEach((oldIdx, newIdx) => {
+                if (prev[oldIdx] !== undefined) next[newIdx] = prev[oldIdx];
+              });
+              return next;
+            });
+          }
+        }
+
+        // 2. Column Widths
+        if (nextState.columnWidths) {
+          const cols = internalColumns ?? (Array.isArray(initialCols) ? initialCols : undefined);
+          setColumnWidths((prev) => {
+            const next = { ...prev };
+            Object.entries(nextState.columnWidths!).forEach(([k, w]) => {
+              const num = parseInt(k, 10);
+              if (!isNaN(num) && String(num) === k) {
+                next[num] = w;
+              } else if (cols) {
+                const idx = cols.findIndex((c) => c.key === k || c.header === k || c.label === k);
+                if (idx !== -1) next[idx] = w;
+              }
+            });
+            return next;
+          });
+        }
+
+        // 3. Sorting
+        if (nextState.sorting !== undefined) {
+          setInternalSortRules(nextState.sorting);
+          onSortChange?.(nextState.sorting);
+        }
+
+        // 4. Filtering
+        if (nextState.filtering !== undefined) {
+          setInternalFilters(nextState.filtering);
+          onFilterChange?.(nextState.filtering);
+        }
+
+        // 5. Grouping
+        if (nextState.grouping?.columns !== undefined) {
+          setInternalGroupColumns(nextState.grouping.columns);
+        }
+        if (nextState.grouping?.expanded !== undefined) {
+          setInternalExpanded(nextState.grouping.expanded);
+          onGroupChange?.(
+            Object.keys(nextState.grouping.expanded).filter((k) => nextState.grouping!.expanded![k])
+          );
+        }
+
+        // 6. Pagination
+        if (nextState.pagination) {
+          if (nextState.pagination.page !== undefined) {
+            pagination?.onPageChange?.(nextState.pagination.page);
+            onPageChange?.(nextState.pagination.page);
+          }
+          if (nextState.pagination.pageSize !== undefined) {
+            pagination?.onPageSizeChange?.(nextState.pagination.pageSize);
+            onPageSizeChange?.(nextState.pagination.pageSize);
+          }
+        }
+      },
+      [
+        internalColumns,
+        initialCols,
+        currentData,
+        setData,
+        onSortChange,
+        onFilterChange,
+        onGroupChange,
+        pagination,
+        onPageChange,
+        onPageSizeChange,
+      ]
+    );
+
+    const resetState = useCallback(() => {
+      const origCols = Array.isArray(initialCols) ? initialCols : undefined;
+      setInternalColumns(origCols);
+      setData(() => controlledData || []);
+
+      const initialWidths: Record<number, number> = {};
+      if (origCols) {
+        origCols.forEach((col, idx) => {
+          if (col.width !== undefined) initialWidths[idx] = col.width;
+        });
+      }
+      setColumnWidths(initialWidths);
+
+      const origSort = sortingConfig?.sort || [];
+      setInternalSortRules(origSort);
+      onSortChange?.(origSort);
+
+      const origFilters = filteringConfig?.filters || [];
+      setInternalFilters(origFilters);
+      onFilterChange?.(origFilters);
+
+      setInternalGroupColumns(grouping?.columns);
+      setInternalExpanded(grouping?.expanded || {});
+      onGroupChange?.(
+        grouping?.expanded ? Object.keys(grouping.expanded).filter((k) => grouping.expanded![k]) : []
+      );
+
+      if (pagination) {
+        pagination.onPageChange?.(1);
+        onPageChange?.(1);
+      }
+    }, [
+      initialCols,
+      controlledData,
+      setData,
+      sortingConfig?.sort,
+      onSortChange,
+      filteringConfig?.filters,
+      onFilterChange,
+      grouping?.columns,
+      grouping?.expanded,
+      onGroupChange,
+      pagination,
+      onPageChange,
+    ]);
+
+    // Track state mutations for onStateChange callback
+    const lastSerializedState = useRef<string>("");
+    useEffect(() => {
+      if (!onStateChange) return;
+      const state = getState();
+      const serialized = JSON.stringify(state);
+      if (serialized !== lastSerializedState.current) {
+        lastSerializedState.current = serialized;
+        onStateChange(state);
+      }
+    }, [getState, onStateChange]);
+
     // Imperative Ref API
     useImperativeHandle(
       ref,
@@ -704,6 +946,9 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
         insertColumn,
         deleteColumn,
         reorderColumn,
+        getState,
+        setState,
+        resetState,
         undo,
         redo,
         copy,
@@ -717,6 +962,9 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
         insertColumn,
         deleteColumn,
         reorderColumn,
+        getState,
+        setState,
+        resetState,
         undo,
         redo,
         copy,

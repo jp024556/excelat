@@ -17,6 +17,7 @@ export type {
   EditMovement,
   ContextMenuContext,
   ExcelatRef,
+  ExcelatGridState,
   ExcelatOperation,
   SortDirection,
   SortRule,
@@ -47,6 +48,7 @@ export {
   applyOperation,
   invertOperation,
   createNullMatrix,
+  reorderColumnsAndData,
 } from "./model/operations";
 export {
   getCellValue,
