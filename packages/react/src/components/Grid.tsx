@@ -1,16 +1,20 @@
 import React from "react";
-import { CellValue, CellCoord, CellRange, ExcelatData, ExcelatColumn, SelectionStyle, ExcelatMode } from "../model/types";
+import { CellValue, CellCoord, CellRange, ExcelatData, ExcelatColumn, SelectionStyle, ExcelatMode, SortRule, Filter } from "../model/types";
 import { ColumnHeader } from "./ColumnHeader";
 import { RowHeader } from "./RowHeader";
 import { Cell } from "./Cell";
+import { GroupRow } from "./GroupRow";
 import { EditMovement } from "../hooks/useEditing";
 import { getCellValue, isCellInRange } from "../model/dataModel";
 import { VirtualizationState } from "../hooks/useVirtualization";
+import { GridDisplayRow } from "../model/grouping";
 
 export interface GridProps {
   totalRows: number;
   totalCols: number;
   data: ExcelatData;
+  displayRows?: GridDisplayRow[];
+  onToggleGroup?: (groupKey: string) => void;
   columns?: ExcelatColumn[];
   mode?: ExcelatMode;
   showRowNumbers?: boolean;
@@ -46,12 +50,23 @@ export interface GridProps {
   onAutoFitCol?: (colIndex: number) => void;
   onStartResizeRow?: (e: React.MouseEvent, rowIndex: number) => void;
   gridRef?: React.Ref<HTMLDivElement>;
+  // Sorting props
+  sortingEnabled?: boolean;
+  sortRules?: SortRule[];
+  onSort?: (colIndex: number, isMulti: boolean) => void;
+  // Filtering props
+  filteringEnabled?: boolean;
+  filters?: Filter[];
+  onApplyFilter?: (filter: Filter) => void;
+  onClearFilter?: (colIndex: number) => void;
 }
 
 export const Grid: React.FC<GridProps> = ({
   totalRows,
   totalCols,
   data,
+  displayRows,
+  onToggleGroup,
   columns,
   mode = "spreadsheet",
   showRowNumbers = true,
@@ -87,6 +102,13 @@ export const Grid: React.FC<GridProps> = ({
   onAutoFitCol,
   onStartResizeRow,
   gridRef,
+  sortingEnabled,
+  sortRules,
+  onSort,
+  filteringEnabled,
+  filters,
+  onApplyFilter,
+  onClearFilter,
 }) => {
   const isVirtual = virtualization?.isVirtual;
   const rowStart = isVirtual ? virtualization.visibleStartRow : 0;
@@ -146,6 +168,13 @@ export const Grid: React.FC<GridProps> = ({
               onSelectAll={onSelectAll}
               onStartResizeCol={onStartResizeCol}
               onAutoFitCol={onAutoFitCol}
+              sortingEnabled={sortingEnabled}
+              sortRules={sortRules}
+              onSort={onSort}
+              filteringEnabled={filteringEnabled}
+              filters={filters}
+              onApplyFilter={onApplyFilter}
+              onClearFilter={onClearFilter}
             />
           </thead>
         )}
@@ -172,6 +201,28 @@ export const Grid: React.FC<GridProps> = ({
               row >= selectionRange.startRow && row <= selectionRange.endRow;
             const rowHeight = rowHeights[row] ?? defaultRowHeight;
 
+            const displayItem = displayRows?.[row];
+
+            // Render group header row if item is group
+            if (displayItem && displayItem.type === "group") {
+              return (
+                <GroupRow
+                  key={`group-${displayItem.groupKey}-${row}`}
+                  item={displayItem}
+                  rowIndex={row}
+                  totalColsSpan={totalColsSpan}
+                  isSelected={isRowSelected}
+                  onToggle={onToggleGroup || (() => {})}
+                />
+              );
+            }
+
+            // Normal data row
+            const dataRowIdx =
+              displayItem && displayItem.type === "data"
+                ? displayItem.dataRowIndex
+                : row;
+
             return (
               <tr
                 key={row}
@@ -181,7 +232,7 @@ export const Grid: React.FC<GridProps> = ({
               >
                 {showRowNumbers && (
                   <RowHeader
-                    rowIndex={row + rowOffset}
+                    rowIndex={(dataRowIdx >= 0 ? dataRowIdx : row) + rowOffset}
                     height={rowHeight}
                     isSelected={isRowSelected}
                     onSelectRow={() => onSelectRow(row)}
@@ -201,7 +252,7 @@ export const Grid: React.FC<GridProps> = ({
                   />
                 )}
                 {colIndices.map((col) => {
-                  const val = getCellValue(data, row, col);
+                  const val = getCellValue(data, dataRowIdx, col);
                   const isSelected =
                     row >= selectionRange.startRow &&
                     row <= selectionRange.endRow &&
@@ -251,7 +302,7 @@ export const Grid: React.FC<GridProps> = ({
                       isFillTarget={isFillTarget}
                       isMoveTarget={isMoveTarget}
                       column={columns?.[col]}
-                      rowData={data[row]}
+                      rowData={data[dataRowIdx]}
                       render={columns?.[col]?.render}
                       editor={columns?.[col]?.editor}
                       onMouseDown={onMouseDownCell}

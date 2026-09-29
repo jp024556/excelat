@@ -3,6 +3,7 @@ import React, {
   useEffect,
   useRef,
   useCallback,
+  useMemo,
   useImperativeHandle,
   forwardRef,
 } from "react";
@@ -16,10 +17,16 @@ import {
   CellRange,
   CellValue,
   ExcelatOperation,
+  SortRule,
+  SortingConfig,
+  Filter,
+  FilteringConfig,
+  ToolbarProps,
 } from "./model/types";
 import { Grid } from "./components/Grid";
 import { FormulaBar } from "./components/FormulaBar";
 import { Pagination } from "./components/Pagination";
+import { GridToolbar } from "./components/Toolbar";
 import { useSelection } from "./hooks/useSelection";
 import { useHistory } from "./hooks/useHistory";
 import { useEditing, EditMovement } from "./hooks/useEditing";
@@ -39,7 +46,11 @@ import {
   ColumnDeleteOp,
   RangeMoveOp,
   RangeUpdateOp,
+  createNullMatrix,
 } from "./model/operations";
+import { sortIndexedRows, cycleSortRule, resolveColumnIndex } from "./model/sorting";
+import { filterIndexedRows } from "./model/filtering";
+import { buildGroupedDisplayRows, GridDisplayRow } from "./model/grouping";
 import "./styles/excelat.css";
 
 export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
@@ -54,8 +65,17 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
       showColumnLetters: propShowColumnLetters,
       showFormulaBar = false,
       virtualization,
+      sorting,
+      onSortChange,
+      filtering,
+      onFilterChange,
+      grouping,
+      onGroupChange,
+      toolbar,
       pagination,
       onPageChange,
+      onPageSizeChange,
+      renderPagination,
       hasMore,
       loading = false,
       onLoadMore,
@@ -88,14 +108,9 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
     const columnDefs: ExcelatColumn[] | undefined = Array.isArray(initialCols)
       ? initialCols
       : undefined;
-    const propColsCount =
-      typeof initialCols === "number"
-        ? initialCols
-        : columnDefs
-        ? columnDefs.length
-        : undefined;
+    const propColsCount = typeof initialCols === "number" ? initialCols : undefined;
 
-    // Maintain internal data state to support both controlled and uncontrolled usage
+    // Internal data state (for uncontrolled or local mutations)
     const [internalData, setInternalData] = useState<ExcelatData>(
       () => controlledData || []
     );
@@ -109,13 +124,11 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
       }
     }, [controlledData]);
 
-    // Compute effective data, rows and columns
     const currentData = internalData;
     const maxDataCols = currentData.reduce(
       (max, row) => Math.max(max, row ? row.length : 0),
       0
     );
-    const totalRows = Math.max(initialRows ?? 100, currentData.length);
     const totalCols = Math.max(
       propColsCount ?? (isTableMode ? maxDataCols : 26),
       maxDataCols
@@ -150,7 +163,185 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
     );
 
     // History / Operations
-    const { executeOperation, undo, redo } = useHistory(setData, onOperation);
+    const { executeOperation, undo, redo, canUndo, canRedo } = useHistory(setData, onOperation);
+
+    // -------------------------------------------------------------------------
+    // Sorting State & Handlers
+    // -------------------------------------------------------------------------
+    const isSortingEnabled = !!sorting;
+    const sortingConfig: SortingConfig | undefined =
+      typeof sorting === "object" ? sorting : undefined;
+
+    const [internalSortRules, setInternalSortRules] = useState<SortRule[]>(
+      () => sortingConfig?.sort || []
+    );
+    useEffect(() => {
+      if (sortingConfig?.sort !== undefined) {
+        setInternalSortRules(sortingConfig.sort);
+      }
+    }, [sortingConfig?.sort]);
+
+    const activeSortRules =
+      sortingConfig?.sort !== undefined ? sortingConfig.sort : internalSortRules;
+
+    const handleSort = useCallback(
+      (colIndex: number, isMulti: boolean) => {
+        const isMultiColumn = isMulti || !!sortingConfig?.multiColumn;
+        const nextRules = cycleSortRule(activeSortRules, colIndex, isMultiColumn, columnDefs);
+        if (!sortingConfig?.sort) {
+          setInternalSortRules(nextRules);
+        }
+        onSortChange?.(nextRules);
+      },
+      [activeSortRules, columnDefs, sortingConfig?.multiColumn, sortingConfig?.sort, onSortChange]
+    );
+
+    // -------------------------------------------------------------------------
+    // Filtering State & Handlers
+    // -------------------------------------------------------------------------
+    const isFilteringEnabled = !!filtering;
+    const filteringConfig: FilteringConfig | undefined =
+      typeof filtering === "object" ? filtering : undefined;
+
+    const [internalFilters, setInternalFilters] = useState<Filter[]>(
+      () => filteringConfig?.filters || []
+    );
+    useEffect(() => {
+      if (filteringConfig?.filters !== undefined) {
+        setInternalFilters(filteringConfig.filters);
+      }
+    }, [filteringConfig?.filters]);
+
+    const activeFilters =
+      filteringConfig?.filters !== undefined ? filteringConfig.filters : internalFilters;
+
+    const handleApplyFilter = useCallback(
+      (newFilter: Filter) => {
+        const colIdx = resolveColumnIndex(newFilter.column, columnDefs);
+        const nextFilters = activeFilters.filter(
+          (f) => resolveColumnIndex(f.column, columnDefs) !== colIdx
+        );
+        if (
+          (newFilter.value !== "" && newFilter.value !== null && newFilter.value !== undefined) ||
+          newFilter.operator === "isEmpty" ||
+          newFilter.operator === "isNotEmpty"
+        ) {
+          nextFilters.push(newFilter);
+        }
+        if (!filteringConfig?.filters) {
+          setInternalFilters(nextFilters);
+        }
+        onFilterChange?.(nextFilters);
+      },
+      [activeFilters, columnDefs, filteringConfig?.filters, onFilterChange]
+    );
+
+    const handleClearFilter = useCallback(
+      (colIndex: number) => {
+        const nextFilters = activeFilters.filter(
+          (f) => resolveColumnIndex(f.column, columnDefs) !== colIndex
+        );
+        if (!filteringConfig?.filters) {
+          setInternalFilters(nextFilters);
+        }
+        onFilterChange?.(nextFilters);
+      },
+      [activeFilters, columnDefs, filteringConfig?.filters, onFilterChange]
+    );
+
+    // -------------------------------------------------------------------------
+    // Grouping State & Handlers
+    // -------------------------------------------------------------------------
+    const [internalExpanded, setInternalExpanded] = useState<Record<string, boolean>>(
+      () => grouping?.expanded || {}
+    );
+    useEffect(() => {
+      if (grouping?.expanded !== undefined) {
+        setInternalExpanded(grouping.expanded);
+      }
+    }, [grouping?.expanded]);
+
+    const activeExpanded =
+      grouping?.expanded !== undefined ? grouping.expanded : internalExpanded;
+
+    const handleToggleGroup = useCallback(
+      (groupKey: string) => {
+        const isCurrentlyExpanded =
+          activeExpanded[groupKey] !== undefined
+            ? activeExpanded[groupKey]
+            : grouping?.defaultExpanded !== false;
+        const nextExpanded = {
+          ...activeExpanded,
+          [groupKey]: !isCurrentlyExpanded,
+        };
+        if (!grouping?.expanded) {
+          setInternalExpanded(nextExpanded);
+        }
+        const expandedKeys = Object.keys(nextExpanded).filter((k) => nextExpanded[k]);
+        onGroupChange?.(expandedKeys);
+      },
+      [activeExpanded, grouping?.defaultExpanded, grouping?.expanded, onGroupChange]
+    );
+
+    // -------------------------------------------------------------------------
+    // Composable Data Pipeline: Filter -> Sort -> Group -> Paginate
+    // -------------------------------------------------------------------------
+    const baseIndexedRows = useMemo(() => {
+      return currentData.map((row, index) => ({ row, index }));
+    }, [currentData]);
+
+    const filteredRows = useMemo(() => {
+      const isClient = !filteringConfig?.mode || filteringConfig.mode === "client";
+      if (isFilteringEnabled && isClient && activeFilters.length > 0) {
+        return filterIndexedRows(baseIndexedRows, activeFilters, columnDefs);
+      }
+      return baseIndexedRows;
+    }, [baseIndexedRows, isFilteringEnabled, filteringConfig?.mode, activeFilters, columnDefs]);
+
+    const sortedRows = useMemo(() => {
+      const isClient = !sortingConfig?.mode || sortingConfig.mode === "client";
+      if (isSortingEnabled && isClient && activeSortRules.length > 0) {
+        return sortIndexedRows(filteredRows, activeSortRules, columnDefs);
+      }
+      return filteredRows;
+    }, [filteredRows, isSortingEnabled, sortingConfig?.mode, activeSortRules, columnDefs]);
+
+    const groupedDisplayRows: GridDisplayRow[] = useMemo(() => {
+      if (grouping?.columns && grouping.columns.length > 0) {
+        return buildGroupedDisplayRows(
+          sortedRows,
+          grouping.columns,
+          activeExpanded,
+          grouping.defaultExpanded !== false,
+          columnDefs
+        );
+      }
+      return sortedRows.map((item) => ({
+        type: "data" as const,
+        dataRowIndex: item.index,
+        row: item.row,
+        depth: 0,
+      }));
+    }, [sortedRows, grouping?.columns, activeExpanded, grouping?.defaultExpanded, columnDefs]);
+
+    const isClientPagination = pagination?.mode === "client";
+    const displayRows: GridDisplayRow[] = useMemo(() => {
+      if (isClientPagination && pagination) {
+        const { page, pageSize } = pagination;
+        const start = (page - 1) * pageSize;
+        return groupedDisplayRows.slice(start, start + pageSize);
+      }
+      return groupedDisplayRows;
+    }, [groupedDisplayRows, isClientPagination, pagination]);
+
+    const hasActiveTransformations =
+      (isFilteringEnabled && activeFilters.length > 0) ||
+      (grouping?.columns && grouping.columns.length > 0) ||
+      (pagination !== undefined);
+
+    const totalRows = hasActiveTransformations
+      ? displayRows.length
+      : Math.max(initialRows ?? 100, displayRows.length);
 
     // Row offset for pagination
     const rowOffset = pagination
@@ -178,20 +369,37 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
       anchor,
       range,
       selectCell,
-      extendSelection,
       setRange,
+      extendSelection,
       startDrag,
       dragTo,
       stopDrag,
-    } = useSelection(totalRows, totalCols, onSelectionChange);
+    } = useSelection(
+      Math.max(1, totalRows),
+      Math.max(1, totalCols),
+      onSelectionChange
+    );
 
-    // Helper to refocus grid viewport
+    // Focus grid
     const focusGrid = useCallback(() => {
-      gridRef.current?.focus();
+      if (gridRef.current) {
+        gridRef.current.focus({ preventScroll: true });
+      }
     }, []);
 
-    // Auto-scroll active cell into view inside the viewport on navigation
-    // Computes target position mathematically so virtualization doesn't break scrolling
+    // Helper: translate visible display row index to underlying data row index
+    const getDataRowIndex = useCallback(
+      (displayRowIdx: number) => {
+        const item = displayRows[displayRowIdx];
+        if (item && item.type === "data") {
+          return item.dataRowIndex;
+        }
+        return displayRowIdx;
+      },
+      [displayRows]
+    );
+
+    // Auto-scroll when active cell moves
     useEffect(() => {
       const viewport = gridRef.current;
       if (!viewport) return;
@@ -211,12 +419,12 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
         columnWidths[anchor.col] ?? columnDefs?.[anchor.col]?.width ?? 100;
       const cellRight = cellLeft + cellWidth;
 
-      const thead = viewport.querySelector(".excelat-thead") as HTMLElement | null;
-      const theadHeight = thead ? thead.offsetHeight : 0;
-      const rowHeader = viewport.querySelector(".excelat-row-header") as HTMLElement | null;
+      const theadHeight = 25;
       const rowHeaderWidth =
-        showRowNumbers && rowHeader
-          ? rowHeader.offsetWidth
+        columnDefs && columnDefs.some((c) => c?.header)
+          ? showRowNumbers
+            ? 46
+            : 0
           : showRowNumbers
           ? 40
           : 0;
@@ -275,8 +483,11 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
 
     // Editing
     const getCellVal = useCallback(
-      (r: number, c: number) => getCellValue(currentData, r, c),
-      [currentData]
+      (displayRowIdx: number, c: number) => {
+        const dataRowIdx = getDataRowIndex(displayRowIdx);
+        return getCellValue(currentData, dataRowIdx, c);
+      },
+      [currentData, getDataRowIndex]
     );
 
     const getColumnType = useCallback(
@@ -284,21 +495,46 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
       [columnDefs]
     );
 
+    // Wrap executeOperation for cell edits to map display row to underlying dataRowIndex
+    const executeOperationMapped = useCallback(
+      (op: any, publicOp?: ExcelatOperation) => {
+        if (op.type === "cell.update") {
+          const underlyingRow = getDataRowIndex(op.row);
+          executeOperation({ ...op, row: underlyingRow }, publicOp);
+        } else {
+          executeOperation(op, publicOp);
+        }
+      },
+      [executeOperation, getDataRowIndex]
+    );
+
     const {
       isEditing,
       editValue,
       editCoord,
-      startEditing,
+      startEditing: internalStartEditing,
       updateEditValue,
       startOrUpdateEdit,
       commitEdit,
       cancelEdit,
     } = useEditing(
       getCellVal,
-      executeOperation,
+      executeOperationMapped,
       handleNavigateAfterCommit,
       readOnly,
       getColumnType
+    );
+
+    // Group rows cannot be edited
+    const startEditing = useCallback(
+      (coord?: CellCoord, initialVal?: string) => {
+        const targetCoord = coord || anchor;
+        if (displayRows[targetCoord.row]?.type === "group") {
+          return;
+        }
+        internalStartEditing(targetCoord, initialVal);
+      },
+      [anchor, displayRows, internalStartEditing]
     );
 
     // Clipboard
@@ -368,12 +604,12 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
         if (readOnly) return;
         const targetCol = index !== undefined ? index : anchor.col;
         const columnsData = currentData.map((_, r) => [
-          values && r < values.length ? values[r] : null,
+          values && values[r] !== undefined ? values[r] : null,
         ]);
         const op: ColumnInsertOp = {
           type: "column.insert",
           columnIndex: targetCol,
-          columnsData,
+          columnsData: columnsData,
         };
         const publicOp: ExcelatOperation = {
           type: "column.insert",
@@ -406,7 +642,7 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
       [readOnly, totalCols, anchor.row, anchor.col, currentData, executeOperation, selectCell]
     );
 
-    // Expose imperative ref
+    // Imperative Ref API
     useImperativeHandle(
       ref,
       () => ({
@@ -418,7 +654,7 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
         redo,
         copy,
         cut,
-        paste: () => paste(),
+        paste,
         focus: focusGrid,
       }),
       [
@@ -434,104 +670,6 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
         focusGrid,
       ]
     );
-
-    // Column resizing handler
-    const handleStartResizeCol = useCallback(
-      (e: React.MouseEvent, colIndex: number) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const startX = e.clientX;
-        const colDef = columnDefs?.[colIndex];
-        const minW = colDef?.minWidth ?? 45;
-        const maxW = colDef?.maxWidth ?? 800;
-        const startWidth = columnWidths[colIndex] ?? colDef?.width ?? 100;
-
-        const handleMouseMove = (moveEvent: MouseEvent) => {
-          const delta = moveEvent.clientX - startX;
-          const newWidth = Math.max(minW, Math.min(maxW, startWidth + delta));
-          setColumnWidths((prev) => ({ ...prev, [colIndex]: newWidth }));
-          onColumnResize?.(colIndex, newWidth);
-        };
-
-        const handleMouseUp = () => {
-          window.removeEventListener("mousemove", handleMouseMove);
-          window.removeEventListener("mouseup", handleMouseUp);
-        };
-
-        window.addEventListener("mousemove", handleMouseMove);
-        window.addEventListener("mouseup", handleMouseUp);
-      },
-      [columnWidths, columnDefs, onColumnResize]
-    );
-
-    // Auto-fit column on double-click
-    const handleAutoFitCol = useCallback(
-      (colIndex: number) => {
-        let maxLen = 0;
-        const headerText =
-          columnDefs?.[colIndex]?.header ??
-          (showColumnLetters ? getColumnLabel(colIndex) : "");
-        maxLen = Math.max(maxLen, headerText.length);
-
-        for (let r = 0; r < currentData.length; r++) {
-          const val = currentData[r]?.[colIndex];
-          if (val !== null && val !== undefined) {
-            maxLen = Math.max(maxLen, String(val).length);
-          }
-        }
-
-        const autoWidth = Math.max(50, Math.min(400, maxLen * 8.5 + 24));
-        setColumnWidths((prev) => ({ ...prev, [colIndex]: autoWidth }));
-        onColumnResize?.(colIndex, autoWidth);
-      },
-      [columnDefs, showColumnLetters, currentData, onColumnResize]
-    );
-
-    // Row resizing handler
-    const handleStartResizeRow = useCallback(
-      (e: React.MouseEvent, rowIndex: number) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const startY = e.clientY;
-        const startHeight = rowHeights[rowIndex] ?? 25;
-
-        const handleMouseMove = (moveEvent: MouseEvent) => {
-          const delta = moveEvent.clientY - startY;
-          const newHeight = Math.max(20, startHeight + delta);
-          setRowHeights((prev) => ({ ...prev, [rowIndex]: newHeight }));
-          onRowResize?.(rowIndex, newHeight);
-        };
-
-        const handleMouseUp = () => {
-          window.removeEventListener("mousemove", handleMouseMove);
-          window.removeEventListener("mouseup", handleMouseUp);
-        };
-
-        window.addEventListener("mousemove", handleMouseMove);
-        window.addEventListener("mouseup", handleMouseUp);
-      },
-      [rowHeights, onRowResize]
-    );
-
-    // Keyboard navigation & shortcuts
-    const { handleKeyDown } = useKeyboard({
-      totalRows,
-      totalCols,
-      getData: getDataLatest,
-      getActiveCell: getActiveCellLatest,
-      getSelectionRange: getSelectionLatest,
-      isEditing,
-      readOnly,
-      selectCell,
-      extendSelection,
-      startEditing,
-      executeOperation,
-      undo,
-      redo,
-      copy,
-      cut,
-      paste,
-    });
 
     // Fill Handle Drag State & Logic
     const [isFillDragging, setIsFillDragging] = useState(false);
@@ -563,153 +701,33 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
       [readOnly, anchor]
     );
 
-    // Global mouseup to finalize fill drag or range move
-    useEffect(() => {
-      const handleGlobalMouseUp = () => {
-        if (isFillDragging) {
-          if (
-            fillTargetRange &&
-            (fillTargetRange.startRow !== range.startRow ||
-              fillTargetRange.startColumn !== range.startColumn ||
-              fillTargetRange.endRow !== range.endRow ||
-              fillTargetRange.endColumn !== range.endColumn)
-          ) {
-            // Apply fill logic
-            const sourceRows = range.endRow - range.startRow + 1;
-            const sourceCols = range.endColumn - range.startColumn + 1;
-            const destRows = fillTargetRange.endRow - fillTargetRange.startRow + 1;
-            const destCols = fillTargetRange.endColumn - fillTargetRange.startColumn + 1;
-
-            const filledValues: CellValue[][] = [];
-
-            // Detect if source is a 1D numeric series in a column (e.g. 10, 20)
-            const isColumnNumericSeries =
-              sourceCols === 1 &&
-              sourceRows >= 2 &&
-              typeof getCellValue(currentData, range.startRow, range.startColumn) === "number" &&
-              typeof getCellValue(currentData, range.startRow + 1, range.startColumn) === "number";
-
-            const step = isColumnNumericSeries
-              ? (getCellValue(currentData, range.startRow + 1, range.startColumn) as number) -
-                (getCellValue(currentData, range.startRow, range.startColumn) as number)
-              : 0;
-
-            for (let r = 0; r < destRows; r++) {
-              const rowVals: CellValue[] = [];
-              const actualRow = fillTargetRange.startRow + r;
-
-              for (let c = 0; c < destCols; c++) {
-                if (isColumnNumericSeries && actualRow > range.endRow) {
-                  const base = getCellValue(currentData, range.endRow, range.startColumn) as number;
-                  const deltaSteps = actualRow - range.endRow;
-                  rowVals.push(base + deltaSteps * step);
-                } else {
-                  // Repeat pattern
-                  const sourceR = range.startRow + (r % sourceRows);
-                  const sourceC = range.startColumn + (c % sourceCols);
-                  rowVals.push(getCellValue(currentData, sourceR, sourceC));
-                }
-              }
-              filledValues.push(rowVals);
-            }
-
-            const previousValues = getRangeValues(currentData, fillTargetRange);
-            const op: RangeUpdateOp = {
-              type: "range.update",
-              range: fillTargetRange,
-              previousValues,
-              values: filledValues,
-            };
-            executeOperation(op, {
-              type: "range.fill",
-              source: range,
-              destination: fillTargetRange,
-              values: filledValues,
-            });
-            setRange(
-              fillTargetRange.startRow,
-              fillTargetRange.startColumn,
-              fillTargetRange.endRow,
-              fillTargetRange.endColumn
-            );
-          }
-          setIsFillDragging(false);
-          setFillTargetRange(null);
-        }
-
-        if (isMoveDragging) {
-          if (
-            moveTargetRange &&
-            (moveTargetRange.startRow !== range.startRow ||
-              moveTargetRange.startColumn !== range.startColumn)
-          ) {
-            const movedValues = getRangeValues(currentData, range);
-            const overwrittenValues = getRangeValues(currentData, moveTargetRange);
-
-            const op: RangeMoveOp = {
-              type: "range.move",
-              sourceRange: range,
-              targetRange: moveTargetRange,
-              movedValues,
-              overwrittenValues,
-            };
-            executeOperation(op, {
-              type: "range.move",
-              source: range,
-              destination: moveTargetRange,
-              values: movedValues,
-            });
-            setRange(
-              moveTargetRange.startRow,
-              moveTargetRange.startColumn,
-              moveTargetRange.endRow,
-              moveTargetRange.endColumn
-            );
-          }
-          setIsMoveDragging(false);
-          setMoveDragStartCoord(null);
-          setMoveTargetRange(null);
-        }
-      };
-
-      if (isFillDragging || isMoveDragging) {
-        window.addEventListener("mouseup", handleGlobalMouseUp);
-        return () => window.removeEventListener("mouseup", handleGlobalMouseUp);
-      }
-    }, [
-      isFillDragging,
-      fillTargetRange,
-      isMoveDragging,
-      moveTargetRange,
-      range,
-      currentData,
-      executeOperation,
-      setRange,
-    ]);
-
-    // Cell mouse interactions
+    // Mouse handlers for cell interactions
     const handleMouseDownCell = useCallback(
       (e: React.MouseEvent, row: number, col: number) => {
+        if (e.button !== 0) return; // Only primary button
+        focusGrid();
+
+        if (displayRows[row]?.type === "group") {
+          selectCell(row, col);
+          return;
+        }
+
         if (isEditing) {
           commitEdit("none");
         }
 
-        if (e.button === 0) {
-          if (e.shiftKey) {
-            extendSelection(row, col);
-          } else {
-            startDrag(row, col);
-          }
-          focusGrid();
+        if (e.shiftKey) {
+          extendSelection(row, col);
+        } else {
+          startDrag(row, col);
         }
       },
-      [isEditing, commitEdit, extendSelection, startDrag, focusGrid]
+      [focusGrid, displayRows, isEditing, commitEdit, extendSelection, startDrag, selectCell]
     );
 
     const handleMouseEnterCell = useCallback(
       (row: number, col: number) => {
         if (isFillDragging) {
-          // Compute fill target range
           const destEndRow = Math.max(range.endRow, row);
           const destEndCol = Math.max(range.endColumn, col);
           setFillTargetRange({
@@ -741,23 +759,22 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
 
         dragTo(row, col);
       },
-      [
-        isFillDragging,
-        isMoveDragging,
-        moveDragStartCoord,
-        range,
-        dragTo,
-      ]
+      [isFillDragging, isMoveDragging, moveDragStartCoord, range, dragTo]
     );
 
     const handleDoubleClickCell = useCallback(
-      (row: number, col: number) => {
+      (row: number, _col: number) => {
+        if (displayRows[row]?.type === "group") {
+          const item = displayRows[row] as any;
+          handleToggleGroup(item.groupKey);
+          return;
+        }
         if (!readOnly) {
-          selectCell(row, col);
-          startEditing({ row, col });
+          selectCell(row, _col);
+          startEditing({ row, col: _col });
         }
       },
-      [readOnly, selectCell, startEditing]
+      [displayRows, handleToggleGroup, readOnly, selectCell, startEditing]
     );
 
     const handleContextMenuCell = useCallback(
@@ -797,8 +814,358 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
       focusGrid();
     }, [isEditing, commitEdit, setRange, totalRows, totalCols, focusGrid]);
 
+    // Resizing columns
+    const handleStartResizeCol = useCallback(
+      (e: React.MouseEvent, colIndex: number) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const startX = e.clientX;
+        const colDef = columnDefs?.[colIndex];
+        const minW = colDef?.minWidth ?? 45;
+        const maxW = colDef?.maxWidth ?? 800;
+        const startWidth = columnWidths[colIndex] ?? colDef?.width ?? 100;
+
+        const handleMouseMove = (moveEvent: MouseEvent) => {
+          const delta = moveEvent.clientX - startX;
+          const newWidth = Math.max(minW, Math.min(maxW, startWidth + delta));
+          setColumnWidths((prev) => ({ ...prev, [colIndex]: newWidth }));
+          onColumnResize?.(colIndex, newWidth);
+        };
+
+        const handleMouseUp = () => {
+          window.removeEventListener("mousemove", handleMouseMove);
+          window.removeEventListener("mouseup", handleMouseUp);
+        };
+
+        window.addEventListener("mousemove", handleMouseMove);
+        window.addEventListener("mouseup", handleMouseUp);
+      },
+      [columnWidths, columnDefs, onColumnResize]
+    );
+
+    const handleAutoFitCol = useCallback(
+      (colIndex: number) => {
+        let maxLen = 0;
+        const headerText =
+          columnDefs?.[colIndex]?.header ??
+          (showColumnLetters ? getColumnLabel(colIndex) : "");
+        maxLen = Math.max(maxLen, headerText.length);
+
+        for (let r = 0; r < currentData.length; r++) {
+          const val = currentData[r]?.[colIndex];
+          if (val !== null && val !== undefined) {
+            maxLen = Math.max(maxLen, String(val).length);
+          }
+        }
+        const autoWidth = Math.max(50, Math.min(500, maxLen * 8 + 24));
+        setColumnWidths((prev) => ({ ...prev, [colIndex]: autoWidth }));
+        onColumnResize?.(colIndex, autoWidth);
+      },
+      [columnDefs, showColumnLetters, currentData, onColumnResize]
+    );
+
+    const handleStartResizeRow = useCallback(
+      (e: React.MouseEvent, rowIndex: number) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const startY = e.clientY;
+        const startHeight = rowHeights[rowIndex] ?? 25;
+
+        const handleMouseMove = (moveEvent: MouseEvent) => {
+          const delta = moveEvent.clientY - startY;
+          const newHeight = Math.max(20, startHeight + delta);
+          setRowHeights((prev) => ({ ...prev, [rowIndex]: newHeight }));
+          onRowResize?.(rowIndex, newHeight);
+        };
+
+        const handleMouseUp = () => {
+          window.removeEventListener("mousemove", handleMouseMove);
+          window.removeEventListener("mouseup", handleMouseUp);
+        };
+
+        window.addEventListener("mousemove", handleMouseMove);
+        window.addEventListener("mouseup", handleMouseUp);
+      },
+      [rowHeights, onRowResize]
+    );
+
+    // Keyboard navigation & shortcuts
+    const { handleKeyDown: originalHandleKeyDown } = useKeyboard({
+      totalRows,
+      totalCols,
+      getData: getDataLatest,
+      getActiveCell: getActiveCellLatest,
+      getSelectionRange: getSelectionLatest,
+      isEditing,
+      readOnly,
+      selectCell,
+      extendSelection,
+      startEditing,
+      executeOperation,
+      undo,
+      redo,
+      copy,
+      cut,
+      paste,
+    });
+
+    // Intercept Enter / Space on group rows to toggle expansion
+    const handleKeyDown = useCallback(
+      (e: React.KeyboardEvent<HTMLDivElement>) => {
+        const currentItem = displayRows[anchor.row];
+        if (currentItem && currentItem.type === "group" && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          handleToggleGroup(currentItem.groupKey);
+          return;
+        }
+        originalHandleKeyDown(e);
+      },
+      [displayRows, anchor.row, handleToggleGroup, originalHandleKeyDown]
+    );
+
+    // Global mouseup to finalize fill drag or range move
+    useEffect(() => {
+      const handleGlobalMouseUp = () => {
+        if (isFillDragging) {
+          if (
+            fillTargetRange &&
+            (fillTargetRange.startRow !== range.startRow ||
+              fillTargetRange.startColumn !== range.startColumn ||
+              fillTargetRange.endRow !== range.endRow ||
+              fillTargetRange.endColumn !== range.endColumn)
+          ) {
+            const sourceRows = range.endRow - range.startRow + 1;
+            const sourceCols = range.endColumn - range.startColumn + 1;
+            const destRows = fillTargetRange.endRow - fillTargetRange.startRow + 1;
+            const destCols = fillTargetRange.endColumn - fillTargetRange.startColumn + 1;
+
+            const filledValues: CellValue[][] = [];
+            const isColumnNumericSeries =
+              sourceCols === 1 &&
+              sourceRows >= 2 &&
+              typeof getCellValue(currentData, range.startRow, range.startColumn) === "number" &&
+              typeof getCellValue(currentData, range.startRow + 1, range.startColumn) === "number";
+
+            const step = isColumnNumericSeries
+              ? (getCellValue(currentData, range.startRow + 1, range.startColumn) as number) -
+                (getCellValue(currentData, range.startRow, range.startColumn) as number)
+              : 0;
+
+            for (let r = 0; r < destRows; r++) {
+              const rowVals: CellValue[] = [];
+              const actualRow = fillTargetRange.startRow + r;
+
+              for (let c = 0; c < destCols; c++) {
+                const actualCol = fillTargetRange.startColumn + c;
+                if (
+                  actualRow >= range.startRow &&
+                  actualRow <= range.endRow &&
+                  actualCol >= range.startColumn &&
+                  actualCol <= range.endColumn
+                ) {
+                  rowVals.push(getCellValue(currentData, actualRow, actualCol));
+                } else if (isColumnNumericSeries && actualRow > range.endRow) {
+                  const baseVal = getCellValue(currentData, range.endRow, actualCol) as number;
+                  const offset = actualRow - range.endRow;
+                  rowVals.push(baseVal + offset * step);
+                } else {
+                  const sourceR = range.startRow + (r % sourceRows);
+                  const sourceC = range.startColumn + (c % sourceCols);
+                  rowVals.push(getCellValue(currentData, sourceR, sourceC));
+                }
+              }
+              filledValues.push(rowVals);
+            }
+
+            const previousValues = getRangeValues(currentData, fillTargetRange);
+            const op: RangeUpdateOp = {
+              type: "range.update",
+              range: { ...fillTargetRange },
+              previousValues,
+              values: filledValues,
+            };
+            const publicOp: ExcelatOperation = {
+              type: "range.fill",
+              source: { ...range },
+              destination: { ...fillTargetRange },
+              values: filledValues,
+            };
+
+            executeOperation(op, publicOp);
+            setRange(
+              fillTargetRange.startRow,
+              fillTargetRange.startColumn,
+              fillTargetRange.endRow,
+              fillTargetRange.endColumn
+            );
+          }
+          setIsFillDragging(false);
+          setFillTargetRange(null);
+        }
+
+        if (isMoveDragging) {
+          if (
+            moveTargetRange &&
+            (moveTargetRange.startRow !== range.startRow ||
+              moveTargetRange.startColumn !== range.startColumn)
+          ) {
+            const values = getRangeValues(currentData, range);
+            const overwrittenValues = getRangeValues(currentData, moveTargetRange);
+            const op: RangeMoveOp = {
+              type: "range.move",
+              sourceRange: { ...range },
+              targetRange: { ...moveTargetRange },
+              movedValues: values,
+              overwrittenValues,
+            };
+            const publicOp: ExcelatOperation = {
+              type: "range.move",
+              source: { ...range },
+              destination: { ...moveTargetRange },
+              values,
+            };
+
+            executeOperation(op, publicOp);
+            setRange(
+              moveTargetRange.startRow,
+              moveTargetRange.startColumn,
+              moveTargetRange.endRow,
+              moveTargetRange.endColumn
+            );
+          }
+          setIsMoveDragging(false);
+          setMoveDragStartCoord(null);
+          setMoveTargetRange(null);
+        }
+      };
+
+      if (isFillDragging || isMoveDragging) {
+        window.addEventListener("mouseup", handleGlobalMouseUp);
+        return () => window.removeEventListener("mouseup", handleGlobalMouseUp);
+      }
+    }, [
+      isFillDragging,
+      fillTargetRange,
+      range,
+      currentData,
+      executeOperation,
+      setRange,
+      isMoveDragging,
+      moveTargetRange,
+    ]);
+
+    // Active cell display coord & value
     const activeCoordText = `${getColumnLabel(anchor.col)}${getRowLabel(anchor.row)}`;
-    const activeCellValue = getCellValue(currentData, anchor.row, anchor.col);
+    const activeDataRowIdx = getDataRowIndex(anchor.row);
+    const activeCellValue = getCellValue(currentData, activeDataRowIdx, anchor.col);
+
+    // Toolbar Props
+    const toolbarProps: ToolbarProps = useMemo(() => {
+      const selectedRowsList: number[] = [];
+      for (let r = range.startRow; r <= range.endRow; r++) {
+        selectedRowsList.push(r);
+      }
+      const selectedColsList: number[] = [];
+      for (let c = range.startColumn; c <= range.endColumn; c++) {
+        selectedColsList.push(c);
+      }
+
+      return {
+        selection: range,
+        activeCell: anchor,
+        selectedRows: selectedRowsList,
+        selectedCols: selectedColsList,
+        canUndo,
+        canRedo,
+        undo,
+        redo,
+        deleteRows: (rowIndices) => {
+          if (rowIndices && rowIndices.length > 0) {
+            [...rowIndices].sort((a, b) => b - a).forEach((idx) => deleteRow(idx));
+          } else {
+            for (let r = range.endRow; r >= range.startRow; r--) {
+              deleteRow(r);
+            }
+          }
+        },
+        insertRow: (idx, vals) => insertRow(idx, vals),
+        deleteColumns: (colIndices) => {
+          if (colIndices && colIndices.length > 0) {
+            [...colIndices].sort((a, b) => b - a).forEach((idx) => deleteColumn(idx));
+          } else {
+            for (let c = range.endColumn; c >= range.startColumn; c--) {
+              deleteColumn(c);
+            }
+          }
+        },
+        insertColumn: (idx, vals) => insertColumn(idx, vals),
+        copy,
+        cut,
+        paste,
+        clearSelection: () => {
+          const rowsCount = range.endRow - range.startRow + 1;
+          const colsCount = range.endColumn - range.startColumn + 1;
+          const nulls = createNullMatrix(rowsCount, colsCount);
+          const previousValues = getRangeValues(currentData, range);
+          const op: RangeUpdateOp = {
+            type: "range.update",
+            range: { ...range },
+            previousValues,
+            values: nulls,
+          };
+          executeOperation(op, { type: "range.clear", range: { ...range } });
+        },
+        data: currentData,
+        totalRows,
+        totalCols,
+        sort: activeSortRules,
+        setSort: (rules) => {
+          setInternalSortRules(rules);
+          onSortChange?.(rules);
+        },
+        filters: activeFilters,
+        setFilters: (newFilters) => {
+          setInternalFilters(newFilters);
+          onFilterChange?.(newFilters);
+        },
+        clearFilters: () => {
+          setInternalFilters([]);
+          onFilterChange?.([]);
+        },
+        groupColumns: grouping?.columns,
+        setGroupColumns: () => {},
+      };
+    }, [
+      range,
+      anchor,
+      canUndo,
+      canRedo,
+      undo,
+      redo,
+      deleteRow,
+      insertRow,
+      deleteColumn,
+      insertColumn,
+      copy,
+      cut,
+      paste,
+      executeOperation,
+      currentData,
+      totalRows,
+      totalCols,
+      activeSortRules,
+      onSortChange,
+      activeFilters,
+      onFilterChange,
+      grouping?.columns,
+    ]);
+
+    // Effective total count for pagination
+    const paginationTotal =
+      pagination?.total ?? (isClientPagination ? groupedDisplayRows.length : currentData.length);
+    const paginationTotalPages = pagination
+      ? Math.max(1, Math.ceil(paginationTotal / pagination.pageSize))
+      : 1;
 
     return (
       <div
@@ -820,11 +1187,14 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
             }}
           />
         )}
+        {toolbar && <GridToolbar toolbar={toolbar} toolbarProps={toolbarProps} />}
         <Grid
           gridRef={gridRef}
           totalRows={totalRows}
           totalCols={totalCols}
           data={currentData}
+          displayRows={displayRows}
+          onToggleGroup={handleToggleGroup}
           columns={columnDefs}
           mode={mode}
           showRowNumbers={showRowNumbers}
@@ -860,19 +1230,50 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
           onStartResizeCol={handleStartResizeCol}
           onAutoFitCol={handleAutoFitCol}
           onStartResizeRow={handleStartResizeRow}
+          sortingEnabled={isSortingEnabled}
+          sortRules={activeSortRules}
+          onSort={handleSort}
+          filteringEnabled={isFilteringEnabled}
+          filters={activeFilters}
+          onApplyFilter={handleApplyFilter}
+          onClearFilter={handleClearFilter}
         />
         {loading && (
           <div className="excelat-loading-banner" role="status" aria-live="polite">
             <span className="excelat-spinner" /> Loading...
           </div>
         )}
-        {pagination && (
-          <Pagination
-            config={pagination}
-            onPageChange={onPageChange}
-            loading={loading}
-          />
-        )}
+        {pagination &&
+          (() => {
+            const effectivePageChange = onPageChange || pagination.onPageChange;
+            const effectivePageSizeChange = onPageSizeChange || pagination.onPageSizeChange;
+            return renderPagination ? (
+              renderPagination({
+                page: pagination.page,
+                pageSize: pagination.pageSize,
+                total: paginationTotal,
+                totalPages: paginationTotalPages,
+                startItem:
+                  paginationTotal > 0
+                    ? Math.min((pagination.page - 1) * pagination.pageSize + 1, paginationTotal)
+                    : 0,
+                endItem: Math.min(pagination.page * pagination.pageSize, paginationTotal),
+                onPageChange: effectivePageChange || (() => {}),
+                onPageSizeChange: effectivePageSizeChange,
+                loading,
+              })
+            ) : (
+              <Pagination
+                config={{
+                  ...pagination,
+                  total: paginationTotal,
+                }}
+                onPageChange={effectivePageChange}
+                onPageSizeChange={effectivePageSizeChange}
+                loading={loading}
+              />
+            );
+          })()}
       </div>
     );
   }

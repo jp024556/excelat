@@ -46,11 +46,14 @@ export interface CustomCellEditorProps {
 export type CustomCellEditor = React.ComponentType<CustomCellEditorProps>;
 
 export interface ExcelatColumn {
+  key?: string;
   header?: string;
   width?: number;
   minWidth?: number;
   maxWidth?: number;
   type?: ExcelatColumnType;
+  sortable?: boolean;
+  filterable?: boolean;
   render?: (context: CellRenderContext) => React.ReactNode;
   editor?: CustomCellEditor;
 }
@@ -127,10 +130,128 @@ export type ExcelatOperation =
       operations: ExcelatOperation[];
     };
 
+// ---------------------------------------------------------------------------
+// Sorting Types
+// ---------------------------------------------------------------------------
+
+export type SortDirection = "asc" | "desc";
+
+export interface SortRule {
+  column: string | number;
+  direction: SortDirection;
+}
+
+export interface SortingConfig {
+  mode?: "client" | "server";
+  sort?: SortRule[];
+  multiColumn?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Filtering Types
+// ---------------------------------------------------------------------------
+
+export type FilterOperator =
+  | "contains"
+  | "notContains"
+  | "equals"
+  | "notEquals"
+  | "startsWith"
+  | "endsWith"
+  | "gt"
+  | "gte"
+  | "lt"
+  | "lte"
+  | "isEmpty"
+  | "isNotEmpty";
+
+export interface Filter {
+  column: string | number;
+  operator: FilterOperator | string;
+  value?: unknown;
+}
+
+export interface FilteringConfig {
+  mode?: "client" | "server";
+  filters?: Filter[];
+}
+
+// ---------------------------------------------------------------------------
+// Grouping Types
+// ---------------------------------------------------------------------------
+
+export interface GroupingConfig {
+  columns: (string | number)[];
+  expanded?: Record<string, boolean>;
+  defaultExpanded?: boolean;
+}
+
+export interface GroupHeaderRow {
+  type: "group";
+  groupKey: string;
+  column: string | number;
+  value: CellValue;
+  count: number;
+  depth: number;
+  isExpanded: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Pagination Types
+// ---------------------------------------------------------------------------
+
 export interface PaginationConfig {
+  mode?: "client" | "server";
+  page: number;
+  pageSize: number;
+  total?: number;
+  onPageChange?: (page: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
+}
+
+export interface PaginationRenderProps {
   page: number;
   pageSize: number;
   total: number;
+  totalPages: number;
+  startItem: number;
+  endItem: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
+  loading?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Toolbar Types
+// ---------------------------------------------------------------------------
+
+export interface ToolbarProps {
+  selection: CellRange;
+  activeCell: CellCoord;
+  selectedRows: number[];
+  selectedCols: number[];
+  canUndo: boolean;
+  canRedo: boolean;
+  undo: () => void;
+  redo: () => void;
+  deleteRows: (rowIndices?: number[]) => void;
+  insertRow: (index?: number, values?: CellValue[]) => void;
+  deleteColumns: (colIndices?: number[]) => void;
+  insertColumn: (index?: number, values?: CellValue[]) => void;
+  copy: () => Promise<string | undefined>;
+  cut: () => Promise<string | undefined>;
+  paste: () => Promise<void>;
+  clearSelection: () => void;
+  data: ExcelatData;
+  totalRows: number;
+  totalCols: number;
+  sort?: SortRule[];
+  setSort?: (rules: SortRule[]) => void;
+  filters?: Filter[];
+  setFilters?: (filters: Filter[]) => void;
+  clearFilters?: () => void;
+  groupColumns?: (string | number)[];
+  setGroupColumns?: (cols: (string | number)[]) => void;
 }
 
 export interface VirtualizationConfig {
@@ -201,13 +322,49 @@ export interface ExcelatProps {
    */
   virtualization?: boolean | VirtualizationConfig;
   /**
-   * Controlled server-side pagination configuration.
+   * Sorting configuration: client-side or server-side.
+   */
+  sorting?: boolean | SortingConfig;
+  /**
+   * Callback fired when sorting rules change.
+   */
+  onSortChange?: (sort: SortRule[]) => void;
+  /**
+   * Filtering configuration: client-side or server-side.
+   */
+  filtering?: boolean | FilteringConfig;
+  /**
+   * Callback fired when filters change.
+   */
+  onFilterChange?: (filters: Filter[]) => void;
+  /**
+   * Row grouping configuration.
+   */
+  grouping?: GroupingConfig;
+  /**
+   * Callback fired when expanded groups change.
+   */
+  onGroupChange?: (expandedGroups: string[]) => void;
+  /**
+   * Custom toolbar element or render function receiving grid state and actions.
+   */
+  toolbar?: React.ReactNode | ((props: ToolbarProps) => React.ReactNode);
+  /**
+   * Controlled server-side or client-side pagination configuration.
    */
   pagination?: PaginationConfig;
   /**
    * Callback fired when page changes in pagination mode.
    */
   onPageChange?: (page: number) => void;
+  /**
+   * Callback fired when page size changes.
+   */
+  onPageSizeChange?: (pageSize: number) => void;
+  /**
+   * Custom pagination render function replacing the default pagination bar.
+   */
+  renderPagination?: (props: PaginationRenderProps) => React.ReactNode;
   /**
    * Whether more data is available for infinite / incremental loading.
    */

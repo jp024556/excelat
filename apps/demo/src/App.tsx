@@ -8,6 +8,8 @@ import {
   ExcelatColumn,
   ExcelatRef,
   ExcelatOperation,
+  SortRule,
+  Filter,
   getColumnLabel,
   getRowLabel,
 } from "@excelat/react";
@@ -29,6 +31,9 @@ import {
   Layers,
   Database,
   Terminal,
+  ArrowUpDown,
+  Filter as FilterIcon,
+  FolderTree,
 } from "lucide-react";
 import "./App.css";
 
@@ -105,10 +110,11 @@ const INITIAL_DATA: ExcelatData = [
 ];
 
 const TABLE_COLUMNS: ExcelatColumn[] = [
-  { header: "Name", width: 120, type: "text" },
-  { header: "Age", width: 80, type: "number" },
-  { header: "City", width: 130, type: "text" },
+  { key: "name", header: "Name", width: 120, type: "text" },
+  { key: "age", header: "Age", width: 80, type: "number" },
+  { key: "city", header: "City", width: 130, type: "text" },
   {
+    key: "salary",
     header: "Salary (INR)",
     width: 140,
     type: "number",
@@ -119,6 +125,7 @@ const TABLE_COLUMNS: ExcelatColumn[] = [
     ),
   },
   {
+    key: "status",
     header: "Status",
     width: 110,
     type: "text",
@@ -140,6 +147,7 @@ const TABLE_COLUMNS: ExcelatColumn[] = [
     editor: StatusDropdownEditor,
   },
   {
+    key: "joinDate",
     header: "Join Date",
     width: 130,
     type: "date",
@@ -150,7 +158,7 @@ const TABLE_COLUMNS: ExcelatColumn[] = [
     ),
     editor: DateInputEditor,
   },
-  { header: "Department", width: 150, type: "text" },
+  { key: "department", header: "Department", width: 150, type: "text" },
 ];
 
 // Generate 10,000 rows for virtualization demonstration
@@ -191,6 +199,18 @@ export function App() {
     rowIndex: number;
     columnIndex: number;
   } | null>(null);
+
+  // Advanced Capabilities State
+  const [sortingMode, setSortingMode] = useState<"client" | "server" | "off">("client");
+  const [filteringMode, setFilteringMode] = useState<"client" | "server" | "off">("client");
+  const [groupingColumn, setGroupingColumn] = useState<string>("department");
+  const [customToolbarEnabled, setCustomToolbarEnabled] = useState<boolean>(false);
+  const [customPaginationEnabled, setCustomPaginationEnabled] = useState<boolean>(false);
+  const [clientPagination, setClientPagination] = useState<boolean>(false);
+  const [clientPage, setClientPage] = useState<number>(1);
+  const [clientPageSize, setClientPageSize] = useState<number>(5);
+  const [serverSort, setServerSort] = useState<SortRule[]>([]);
+  const [serverFilters, setServerFilters] = useState<Filter[]>([]);
 
   // Pagination Scenario State
   const [page, setPage] = useState<number>(1);
@@ -483,6 +503,96 @@ export function App() {
             <span>Formula Bar</span>
           </label>
         </div>
+
+        {/* Data Capabilities Controls */}
+        <div className="control-group">
+          <div className="control-label">
+            <ArrowUpDown size={15} />
+            <span>Sorting</span>
+          </div>
+          <div className="selection-style-group">
+            {(["client", "server", "off"] as const).map((m) => (
+              <button
+                key={m}
+                className={`style-btn ${sortingMode === m ? "active" : ""}`}
+                onClick={() => setSortingMode(m)}
+              >
+                {m === "client" ? "Client" : m === "server" ? "Server" : "Off"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="control-group">
+          <div className="control-label">
+            <FilterIcon size={15} />
+            <span>Filtering</span>
+          </div>
+          <div className="selection-style-group">
+            {(["client", "server", "off"] as const).map((m) => (
+              <button
+                key={m}
+                className={`style-btn ${filteringMode === m ? "active" : ""}`}
+                onClick={() => setFilteringMode(m)}
+              >
+                {m === "client" ? "Client" : m === "server" ? "Server" : "Off"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="control-group">
+          <div className="control-label">
+            <FolderTree size={15} />
+            <span>Grouping</span>
+          </div>
+          <div className="selection-style-group">
+            {[
+              { id: "", label: "None" },
+              { id: "department", label: "Dept" },
+              { id: "city", label: "City" },
+            ].map(({ id, label }) => (
+              <button
+                key={id}
+                className={`style-btn ${groupingColumn === id ? "active" : ""}`}
+                onClick={() => setGroupingColumn(id)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="control-group checkboxes-group">
+          <label className="checkbox-label" title="Render custom toolbar slot">
+            <input
+              type="checkbox"
+              checked={customToolbarEnabled}
+              onChange={(e) => setCustomToolbarEnabled(e.target.checked)}
+            />
+            <span>Custom Toolbar</span>
+          </label>
+
+          <label className="checkbox-label" title="Render custom pagination slot">
+            <input
+              type="checkbox"
+              checked={customPaginationEnabled}
+              onChange={(e) => setCustomPaginationEnabled(e.target.checked)}
+            />
+            <span>Custom Pagination UI</span>
+          </label>
+
+          {scenario === "standard" && (
+            <label className="checkbox-label" title="Enable client-side pagination on local data">
+              <input
+                type="checkbox"
+                checked={clientPagination}
+                onChange={(e) => setClientPagination(e.target.checked)}
+              />
+              <span>Client Pagination</span>
+            </label>
+          )}
+        </div>
       </section>
 
       {/* Grid Operations Toolbar */}
@@ -551,88 +661,224 @@ export function App() {
       <main className="demo-main">
         <div className="demo-grid-card">
           <div className="demo-spreadsheet-container">
-            {scenario === "standard" && (
-              <Excelat
-                ref={gridRef}
-                data={data}
-                mode={mode}
-                columns={mode === "table" ? TABLE_COLUMNS : 15}
-                rows={mode === "table" ? 25 : 35}
-                selectionStyle={selectionStyle}
-                showRowNumbers={showRowNumbers}
-                showColumnLetters={showColumnLetters}
-                showFormulaBar={showFormulaBar}
-                onChange={setData}
-                onSelectionChange={setSelection}
-                onOperation={handleOperation}
-                onContextMenu={(e, ctx) => {
-                  e.preventDefault();
-                  setContextMenu({
-                    x: e.clientX,
-                    y: e.clientY,
-                    rowIndex: ctx.rowIndex,
-                    columnIndex: ctx.columnIndex,
+            {(() => {
+              const sharedProps = {
+                mode,
+                selectionStyle,
+                showRowNumbers,
+                showColumnLetters,
+                showFormulaBar,
+                sorting:
+                  sortingMode !== "off"
+                    ? {
+                        mode: sortingMode,
+                        sort: sortingMode === "server" ? serverSort : undefined,
+                      }
+                    : undefined,
+                onSortChange: (rules: SortRule[]) => {
+                  if (sortingMode === "server") setServerSort(rules);
+                  handleOperation({
+                    type: "cell.update",
+                    row: 0,
+                    column: 0,
+                    previousValue: null,
+                    value: `Sort changed: ${rules.map((r) => `${r.column}:${r.direction}`).join(", ") || "none"}`,
                   });
-                }}
-              />
-            )}
+                },
+                filtering:
+                  filteringMode !== "off"
+                    ? {
+                        mode: filteringMode,
+                        filters: filteringMode === "server" ? serverFilters : undefined,
+                      }
+                    : undefined,
+                onFilterChange: (filters: Filter[]) => {
+                  if (filteringMode === "server") setServerFilters(filters);
+                  handleOperation({
+                    type: "cell.update",
+                    row: 0,
+                    column: 0,
+                    previousValue: null,
+                    value: `Filter changed: ${filters.map((f) => `${f.column} ${f.operator} ${f.value}`).join(", ") || "none"}`,
+                  });
+                },
+                grouping: groupingColumn ? { columns: [groupingColumn] } : undefined,
+                toolbar: customToolbarEnabled
+                  ? ({ canUndo, canRedo, undo, redo, insertRow, deleteRows, clearSelection }: any) => (
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "8px",
+                          alignItems: "center",
+                          padding: "6px 12px",
+                          background: "rgba(0,0,0,0.03)",
+                          borderBottom: "1px solid var(--border-color)",
+                          fontSize: "12px",
+                        }}
+                      >
+                        <span style={{ fontWeight: 600, color: "var(--primary)" }}>Toolbar Slot:</span>
+                        <button
+                          className="demo-btn demo-btn-secondary"
+                          style={{ padding: "3px 8px", fontSize: "11px" }}
+                          disabled={!canUndo}
+                          onClick={undo}
+                        >
+                          Undo
+                        </button>
+                        <button
+                          className="demo-btn demo-btn-secondary"
+                          style={{ padding: "3px 8px", fontSize: "11px" }}
+                          disabled={!canRedo}
+                          onClick={redo}
+                        >
+                          Redo
+                        </button>
+                        <button
+                          className="demo-btn demo-btn-secondary"
+                          style={{ padding: "3px 8px", fontSize: "11px" }}
+                          onClick={() => insertRow?.()}
+                        >
+                          + Add Row
+                        </button>
+                        <button
+                          className="demo-btn demo-btn-secondary"
+                          style={{ padding: "3px 8px", fontSize: "11px" }}
+                          onClick={() => deleteRows?.()}
+                        >
+                          - Delete
+                        </button>
+                        <button
+                          className="demo-btn demo-btn-secondary"
+                          style={{ padding: "3px 8px", fontSize: "11px" }}
+                          onClick={clearSelection}
+                        >
+                          Clear Select
+                        </button>
+                      </div>
+                    )
+                  : undefined,
+                renderPagination: customPaginationEnabled
+                  ? (props: any) => (
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          padding: "8px 16px",
+                          background: "rgba(0,0,0,0.02)",
+                          borderTop: "1px solid var(--border-color)",
+                          fontSize: "12px",
+                        }}
+                      >
+                        <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>
+                          Custom Pagination UI: Page {props.page} of {props.totalPages} ({props.total} items)
+                        </span>
+                        <div style={{ display: "flex", gap: "6px" }}>
+                          <button
+                            className="demo-btn demo-btn-secondary"
+                            style={{ padding: "3px 10px", fontSize: "11px" }}
+                            disabled={props.page <= 1}
+                            onClick={() => props.onPageChange(props.page - 1)}
+                          >
+                            Prev
+                          </button>
+                          <button
+                            className="demo-btn demo-btn-secondary"
+                            style={{ padding: "3px 10px", fontSize: "11px" }}
+                            disabled={props.page >= props.totalPages}
+                            onClick={() => props.onPageChange(props.page + 1)}
+                          >
+                            Next
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  : undefined,
+                onSelectionChange: setSelection,
+                onOperation: handleOperation,
+              };
 
-            {scenario === "virtualization" && (
-              <Excelat
-                ref={gridRef}
-                data={virtualData}
-                virtualization
-                mode={mode}
-                columns={TABLE_COLUMNS}
-                selectionStyle={selectionStyle}
-                showRowNumbers={showRowNumbers}
-                showColumnLetters={showColumnLetters}
-                showFormulaBar={showFormulaBar}
-                onSelectionChange={setSelection}
-                onOperation={handleOperation}
-              />
-            )}
+              if (scenario === "standard") {
+                return (
+                  <Excelat
+                    ref={gridRef}
+                    data={data}
+                    columns={TABLE_COLUMNS}
+                    rows={mode === "table" ? 25 : 35}
+                    onChange={setData}
+                    pagination={
+                      clientPagination
+                        ? {
+                            mode: "client",
+                            page: clientPage,
+                            pageSize: clientPageSize,
+                            onPageChange: setClientPage,
+                            onPageSizeChange: setClientPageSize,
+                          }
+                        : undefined
+                    }
+                    onContextMenu={(e, ctx) => {
+                      e.preventDefault();
+                      setContextMenu({
+                        x: e.clientX,
+                        y: e.clientY,
+                        rowIndex: ctx.rowIndex,
+                        columnIndex: ctx.columnIndex,
+                      });
+                    }}
+                    {...sharedProps}
+                  />
+                );
+              }
 
-            {scenario === "pagination" && (
-              <Excelat
-                ref={gridRef}
-                data={pageData}
-                pagination={{
-                  page,
-                  pageSize,
-                  total: totalItems,
-                }}
-                loading={isPageLoading}
-                onPageChange={handlePageChange}
-                mode={mode}
-                columns={TABLE_COLUMNS}
-                selectionStyle={selectionStyle}
-                showRowNumbers={showRowNumbers}
-                showColumnLetters={showColumnLetters}
-                showFormulaBar={showFormulaBar}
-                onSelectionChange={setSelection}
-                onOperation={handleOperation}
-              />
-            )}
+              if (scenario === "virtualization") {
+                return (
+                  <Excelat
+                    ref={gridRef}
+                    data={virtualData}
+                    virtualization
+                    columns={TABLE_COLUMNS}
+                    {...sharedProps}
+                  />
+                );
+              }
 
-            {scenario === "infinite" && (
-              <Excelat
-                ref={gridRef}
-                data={infiniteRows}
-                virtualization
-                hasMore={hasMore}
-                loading={isInfiniteLoading}
-                onLoadMore={handleLoadMore}
-                mode={mode}
-                columns={TABLE_COLUMNS}
-                selectionStyle={selectionStyle}
-                showRowNumbers={showRowNumbers}
-                showColumnLetters={showColumnLetters}
-                showFormulaBar={showFormulaBar}
-                onSelectionChange={setSelection}
-                onOperation={handleOperation}
-              />
-            )}
+              if (scenario === "pagination") {
+                return (
+                  <Excelat
+                    ref={gridRef}
+                    data={pageData}
+                    pagination={{
+                      mode: "server",
+                      page,
+                      pageSize,
+                      total: totalItems,
+                    }}
+                    loading={isPageLoading}
+                    onPageChange={handlePageChange}
+                    columns={TABLE_COLUMNS}
+                    {...sharedProps}
+                  />
+                );
+              }
+
+              if (scenario === "infinite") {
+                return (
+                  <Excelat
+                    ref={gridRef}
+                    data={infiniteRows}
+                    virtualization
+                    hasMore={hasMore}
+                    loading={isInfiniteLoading}
+                    onLoadMore={handleLoadMore}
+                    columns={TABLE_COLUMNS}
+                    {...sharedProps}
+                  />
+                );
+              }
+
+              return null;
+            })()}
           </div>
 
           {/* Context Menu */}
