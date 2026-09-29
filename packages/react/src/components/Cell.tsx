@@ -73,8 +73,9 @@ export const Cell: React.FC<CellProps> = React.memo(
     onCommitEdit,
     onCancelEdit,
   }) => {
-    // Determine alignment and formatting based on value type
-    let cellType = "text";
+    // Determine alignment and formatting based on value type or column type
+    const colType = column?.type;
+    let cellType = colType === "number" ? "number" : colType === "boolean" ? "boolean" : "text";
     let formattedText = "";
 
     if (value !== null && value !== undefined) {
@@ -92,6 +93,7 @@ export const Cell: React.FC<CellProps> = React.memo(
     const classNames = [
       "excelat-cell",
       `excelat-cell-${cellType}`,
+      column?.align ? `excelat-align-${column.align}` : "",
       isEditing ? "excelat-cell-editing" : "",
       isFillTarget ? "excelat-cell-fill-target" : "",
       isMoveTarget ? "excelat-cell-move-target" : "",

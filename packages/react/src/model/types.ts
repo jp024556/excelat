@@ -52,6 +52,7 @@ export interface ExcelatColumn {
   minWidth?: number;
   maxWidth?: number;
   type?: ExcelatColumnType;
+  align?: "left" | "center" | "right";
   sortable?: boolean;
   filterable?: boolean;
   render?: (context: CellRenderContext) => React.ReactNode;

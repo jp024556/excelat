@@ -118,32 +118,38 @@ const TABLE_COLUMNS: ExcelatColumn[] = [
     header: "Salary (INR)",
     width: 140,
     type: "number",
-    render: ({ value }) => (
-      <span style={{ fontWeight: 600 }}>
-        ₹{Number(value || 0).toLocaleString("en-IN")}
-      </span>
-    ),
+    render: ({ value }) => {
+      if (value === null || value === undefined || value === "") return null;
+      return (
+        <span style={{ fontWeight: 600 }}>
+          ₹{Number(value).toLocaleString("en-IN")}
+        </span>
+      );
+    },
   },
   {
     key: "status",
     header: "Status",
     width: 110,
     type: "text",
-    render: ({ value }) => (
-      <span
-        style={{
-          display: "inline-block",
-          padding: "2px 8px",
-          borderRadius: "12px",
-          fontSize: "11px",
-          fontWeight: 600,
-          background: value === "Active" ? "#dcfce7" : "#fee2e2",
-          color: value === "Active" ? "#15803d" : "#b91c1c",
-        }}
-      >
-        {String(value || "")}
-      </span>
-    ),
+    render: ({ value }) => {
+      if (!value) return null;
+      return (
+        <span
+          style={{
+            display: "inline-block",
+            padding: "2px 8px",
+            borderRadius: "12px",
+            fontSize: "11px",
+            fontWeight: 600,
+            background: value === "Active" ? "#dcfce7" : "#fee2e2",
+            color: value === "Active" ? "#15803d" : "#b91c1c",
+          }}
+        >
+          {String(value)}
+        </span>
+      );
+    },
     editor: StatusDropdownEditor,
   },
   {

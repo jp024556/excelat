@@ -232,6 +232,9 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = React.memo(
                   ref={popoverRef}
                   className="excelat-filter-popover"
                   onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  onKeyUp={(e) => e.stopPropagation()}
                 >
                   <div className="excelat-filter-popover-title">
                     Filter: {customHeader || colLetter}

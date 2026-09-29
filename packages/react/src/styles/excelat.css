@@ -313,6 +313,21 @@
   color: #475569;
 }
 
+.excelat-align-left .excelat-cell-content {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.excelat-align-center .excelat-cell-content {
+  justify-content: center;
+  text-align: center;
+}
+
+.excelat-align-right .excelat-cell-content {
+  justify-content: flex-end;
+  text-align: right;
+}
+
 /* Selection Style: Excel */
 .excelat-cell-selected {
   background-color: var(--excelat-primary-light);

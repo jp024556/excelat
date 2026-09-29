@@ -45,6 +45,18 @@ export function useKeyboard({
       // If currently editing in the inline editor, let the editor handle its keys
       if (isEditing) return;
 
+      // If user is interacting with an external input, select, textarea, or popover element, do not intercept
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "SELECT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+
       const isMac = typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
       const isCmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
       const activeCell = getActiveCell();
