@@ -52,6 +52,12 @@ export function mapGridOpToPublicOp(op: GridOperation): ExcelatOperation {
         type: "column.delete",
         index: op.columnIndex,
       };
+    case "column.reorder":
+      return {
+        type: "column.reorder",
+        fromIndex: op.fromIndex,
+        toIndex: op.toIndex,
+      };
     case "range.move":
       return {
         type: "range.move",

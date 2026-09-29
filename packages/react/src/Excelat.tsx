@@ -44,9 +44,11 @@ import {
   RowDeleteOp,
   ColumnInsertOp,
   ColumnDeleteOp,
+  ColumnReorderOp,
   RangeMoveOp,
   RangeUpdateOp,
   createNullMatrix,
+  reorderArray,
 } from "./model/operations";
 import { sortIndexedRows, cycleSortRule, resolveColumnIndex } from "./model/sorting";
 import { filterIndexedRows } from "./model/filtering";
@@ -84,6 +86,8 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
       onSelectionChange,
       onColumnResize,
       onRowResize,
+      columnReorder = true,
+      onColumnReorder,
       onContextMenu,
       className = "",
       style,
@@ -104,10 +108,17 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
         ? "subtle"
         : "excel";
 
-    // Parse column definitions if provided as array
-    const columnDefs: ExcelatColumn[] | undefined = Array.isArray(initialCols)
-      ? initialCols
-      : undefined;
+    // Internal column definitions state (for reordering or local updates)
+    const [internalColumns, setInternalColumns] = useState<ExcelatColumn[] | undefined>(
+      () => (Array.isArray(initialCols) ? initialCols : undefined)
+    );
+    const [prevInitialCols, setPrevInitialCols] = useState(initialCols);
+    if (initialCols !== prevInitialCols) {
+      setPrevInitialCols(initialCols);
+      setInternalColumns(Array.isArray(initialCols) ? initialCols : undefined);
+    }
+
+    const columnDefs = internalColumns;
     const propColsCount = typeof initialCols === "number" ? initialCols : undefined;
 
     // Internal data state (for uncontrolled or local mutations)
@@ -127,9 +138,12 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
       (max, row) => Math.max(max, row ? row.length : 0),
       0
     );
+    const columnsCount =
+      propColsCount ?? (columnDefs ? columnDefs.length : undefined);
     const totalCols = Math.max(
-      propColsCount ?? (isTableMode ? maxDataCols : 26),
-      maxDataCols
+      columnsCount ?? (isTableMode ? maxDataCols : 26),
+      maxDataCols,
+      columnsCount ?? 0
     );
 
     const gridRef = useRef<HTMLDivElement>(null);
@@ -419,7 +433,7 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
 
       const theadHeight = 25;
       const rowHeaderWidth =
-        columnDefs && columnDefs.some((c) => c?.header)
+        columnDefs && columnDefs.some((c) => c?.header || c?.label)
           ? showRowNumbers
             ? 46
             : 0
@@ -640,6 +654,47 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
       [readOnly, totalCols, anchor.row, anchor.col, currentData, executeOperation, selectCell]
     );
 
+    const reorderColumn = useCallback(
+      (fromIndex: number, toIndex: number) => {
+        if (readOnly || fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
+        if (fromIndex >= totalCols || toIndex >= totalCols) return;
+
+        // 1. Reorder column widths
+        setColumnWidths((prev) => {
+          const currentList = Array.from({ length: totalCols }, (_, i) => prev[i]);
+          const nextList = reorderArray(currentList, fromIndex, toIndex);
+          const nextWidths: Record<number, number> = {};
+          nextList.forEach((w, i) => {
+            if (w !== undefined) nextWidths[i] = w;
+          });
+          return nextWidths;
+        });
+
+        // 2. Reorder internalColumns if defined
+        let nextCols: ExcelatColumn[] | undefined;
+        if (internalColumns) {
+          nextCols = reorderArray(internalColumns, fromIndex, toIndex);
+          setInternalColumns(nextCols);
+        }
+
+        // 3. Apply operation to data
+        const op: ColumnReorderOp = {
+          type: "column.reorder",
+          fromIndex,
+          toIndex,
+        };
+        const publicOp: ExcelatOperation = {
+          type: "column.reorder",
+          fromIndex,
+          toIndex,
+        };
+        executeOperation(op, publicOp);
+
+        onColumnReorder?.(fromIndex, toIndex, nextCols);
+      },
+      [readOnly, totalCols, internalColumns, executeOperation, onColumnReorder]
+    );
+
     // Imperative Ref API
     useImperativeHandle(
       ref,
@@ -648,6 +703,7 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
         deleteRow,
         insertColumn,
         deleteColumn,
+        reorderColumn,
         undo,
         redo,
         copy,
@@ -660,6 +716,7 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
         deleteRow,
         insertColumn,
         deleteColumn,
+        reorderColumn,
         undo,
         redo,
         copy,
@@ -846,6 +903,7 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
         let maxLen = 0;
         const headerText =
           columnDefs?.[colIndex]?.header ??
+          columnDefs?.[colIndex]?.label ??
           (showColumnLetters ? getColumnLabel(colIndex) : "");
         maxLen = Math.max(maxLen, headerText.length);
 
@@ -1235,6 +1293,8 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
           filters={activeFilters}
           onApplyFilter={handleApplyFilter}
           onClearFilter={handleClearFilter}
+          columnReorder={columnReorder}
+          onReorderColumn={reorderColumn}
         />
         {loading && (
           <div className="excelat-loading-banner" role="status" aria-live="polite">

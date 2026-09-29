@@ -58,7 +58,7 @@ export function buildGroupedDisplayRows(
     const groupColId = groupColumns[colIndexInGroup];
     const actualColIdx = resolveColumnIndex(groupColId, columns);
     const colDef = actualColIdx !== -1 && columns ? columns[actualColIdx] : undefined;
-    const headerTitle = colDef?.header ?? `Col ${groupColId}`;
+    const headerTitle = colDef?.header ?? colDef?.label ?? `Col ${groupColId}`;
 
     // Bucket rows by the value in actualColIdx
     const buckets = new Map<string, { value: CellValue; rows: { row: CellValue[]; index: number }[] }>();

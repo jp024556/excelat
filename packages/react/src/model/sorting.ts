@@ -15,7 +15,9 @@ export function resolveColumnIndex(
   if (byKey !== -1) return byKey;
 
   const byHeader = columns.findIndex(
-    (c) => c.header && c.header.toLowerCase() === colId.toLowerCase()
+    (c) =>
+      (c.header && c.header.toLowerCase() === colId.toLowerCase()) ||
+      (c.label && c.label.toLowerCase() === colId.toLowerCase())
   );
   if (byHeader !== -1) return byHeader;
 

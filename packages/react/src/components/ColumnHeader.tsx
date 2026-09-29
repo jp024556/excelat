@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { getColumnLabel } from "../model/dataModel";
 import { ExcelatColumn, SortRule, Filter, FilterOperator } from "../model/types";
 import { resolveColumnIndex } from "../model/sorting";
+import { computeReorderTarget } from "../model/operations";
 
 export interface ColumnHeaderProps {
   totalCols: number;
@@ -27,6 +28,9 @@ export interface ColumnHeaderProps {
   filters?: Filter[];
   onApplyFilter?: (filter: Filter) => void;
   onClearFilter?: (colIndex: number) => void;
+  // Column Reordering props
+  columnReorder?: boolean;
+  onReorderColumn?: (fromIndex: number, toIndex: number) => void;
 }
 
 export const ColumnHeader: React.FC<ColumnHeaderProps> = React.memo(
@@ -52,9 +56,18 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = React.memo(
     filters = [],
     onApplyFilter,
     onClearFilter,
+    columnReorder = true,
+    onReorderColumn,
   }) => {
     const colIndices =
       visibleColIndices ?? Array.from({ length: totalCols }, (_, i) => i);
+
+    // Column Drag & Drop Reordering state
+    const [draggedColIndex, setDraggedColIndex] = useState<number | null>(null);
+    const [dropIndicator, setDropIndicator] = useState<{
+      targetCol: number;
+      position: "before" | "after";
+    } | null>(null);
 
     // Active filter popover column index
     const [openFilterCol, setOpenFilterCol] = useState<number | null>(null);
@@ -125,7 +138,7 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = React.memo(
         {colIndices.map((col) => {
           const selected = isColumnSelected(col);
           const colDef = columns?.[col];
-          const customHeader = colDef?.header;
+          const customHeader = colDef?.header ?? colDef?.label;
           const colLetter = getColumnLabel(col);
           const label =
             customHeader !== undefined
@@ -158,11 +171,20 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = React.memo(
             onSelectColumn?.(col);
           };
 
+          const isDraggable = columnReorder !== false && onReorderColumn !== undefined;
+          const isDragging = draggedColIndex === col;
+          const isDropBefore = dropIndicator?.targetCol === col && dropIndicator.position === "before";
+          const isDropAfter = dropIndicator?.targetCol === col && dropIndicator.position === "after";
+
           return (
             <th
               key={col}
               className={`excelat-col-header ${selected ? "excelat-header-selected" : ""} ${
                 isColSortable ? "excelat-header-sortable" : ""
+              } ${isDraggable ? "excelat-col-draggable" : ""} ${
+                isDragging ? "excelat-col-dragging" : ""
+              } ${isDropBefore ? "excelat-col-drop-before" : ""} ${
+                isDropAfter ? "excelat-col-drop-after" : ""
               }`}
               style={{
                 width: `${width}px`,
@@ -173,6 +195,56 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = React.memo(
               data-col={col}
               onClick={handleHeaderClick}
               title={label ? `Column: ${label}` : undefined}
+              draggable={isDraggable}
+              onDragStart={(e) => {
+                const target = e.target as HTMLElement;
+                if (target.closest(".excelat-col-resize-handle, .excelat-filter-btn, .excelat-filter-popover")) {
+                  e.preventDefault();
+                  return;
+                }
+                setDraggedColIndex(col);
+                if (e.dataTransfer) {
+                  e.dataTransfer.setData("text/plain", String(col));
+                  e.dataTransfer.effectAllowed = "move";
+                }
+              }}
+              onDragOver={(e) => {
+                if (draggedColIndex === null || !isDraggable) return;
+                e.preventDefault();
+                if (e.dataTransfer) {
+                  e.dataTransfer.dropEffect = "move";
+                }
+                const rect = e.currentTarget.getBoundingClientRect();
+                const clientX = e.clientX !== undefined ? e.clientX : 0;
+                const isAfter = (clientX - rect.left) > rect.width / 2;
+                const position = isAfter ? "after" : "before";
+                if (dropIndicator?.targetCol !== col || dropIndicator?.position !== position) {
+                  setDropIndicator({ targetCol: col, position });
+                }
+              }}
+              onDragLeave={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                  if (dropIndicator?.targetCol === col) {
+                    setDropIndicator(null);
+                  }
+                }
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (draggedColIndex !== null && dropIndicator !== null) {
+                  const fromIdx = draggedColIndex;
+                  const toIdx = computeReorderTarget(fromIdx, dropIndicator.targetCol, dropIndicator.position);
+                  if (fromIdx !== toIdx) {
+                    onReorderColumn?.(fromIdx, toIdx);
+                  }
+                }
+                setDraggedColIndex(null);
+                setDropIndicator(null);
+              }}
+              onDragEnd={() => {
+                setDraggedColIndex(null);
+                setDropIndicator(null);
+              }}
             >
               <div className="excelat-col-header-content">
                 <span className="excelat-col-header-text">{label}</span>

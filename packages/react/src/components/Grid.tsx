@@ -59,6 +59,9 @@ export interface GridProps {
   filters?: Filter[];
   onApplyFilter?: (filter: Filter) => void;
   onClearFilter?: (colIndex: number) => void;
+  // Column Reordering props
+  columnReorder?: boolean;
+  onReorderColumn?: (fromIndex: number, toIndex: number) => void;
 }
 
 export const Grid: React.FC<GridProps> = ({
@@ -109,6 +112,8 @@ export const Grid: React.FC<GridProps> = ({
   filters,
   onApplyFilter,
   onClearFilter,
+  columnReorder = true,
+  onReorderColumn,
 }) => {
   const isVirtual = virtualization?.isVirtual;
   const rowStart = isVirtual ? virtualization.visibleStartRow : 0;
@@ -132,7 +137,8 @@ export const Grid: React.FC<GridProps> = ({
 
   const shouldRenderThead =
     showColumnLetters ||
-    (columns !== undefined && columns.some((c) => c?.header !== undefined));
+    (columns !== undefined &&
+      columns.some((c) => c?.header !== undefined || c?.label !== undefined));
 
   const totalColsSpan =
     colIndices.length +
@@ -177,6 +183,8 @@ export const Grid: React.FC<GridProps> = ({
               filters={filters}
               onApplyFilter={onApplyFilter}
               onClearFilter={onClearFilter}
+              columnReorder={columnReorder}
+              onReorderColumn={onReorderColumn}
             />
           </thead>
         )}

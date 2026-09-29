@@ -205,6 +205,47 @@
   white-space: nowrap;
 }
 
+/* Column Drag & Drop Reordering */
+.excelat-col-header.excelat-col-draggable {
+  cursor: grab;
+}
+
+.excelat-col-header.excelat-col-draggable:active {
+  cursor: grabbing;
+}
+
+.excelat-col-header.excelat-col-dragging {
+  opacity: 0.45;
+  background-color: var(--excelat-header-selected-bg, #e2e8f0);
+  cursor: grabbing;
+}
+
+.excelat-col-header.excelat-col-drop-before::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+  background-color: var(--excelat-primary, #2563eb);
+  z-index: 25;
+  pointer-events: none;
+  border-radius: 1px;
+}
+
+.excelat-col-header.excelat-col-drop-after::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 3px;
+  height: 100%;
+  background-color: var(--excelat-primary, #2563eb);
+  z-index: 25;
+  pointer-events: none;
+  border-radius: 1px;
+}
+
 .excelat-row-header {
   position: sticky;
   left: 0;

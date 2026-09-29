@@ -194,6 +194,7 @@ export function App() {
   const [showRowNumbers, setShowRowNumbers] = useState<boolean>(true);
   const [showColumnLetters, setShowColumnLetters] = useState<boolean>(true);
   const [showFormulaBar, setShowFormulaBar] = useState<boolean>(true);
+  const [columnReorderEnabled, setColumnReorderEnabled] = useState<boolean>(true);
   const [selection, setSelection] = useState<CellRange>({
     startRow: 0,
     startColumn: 0,
@@ -514,6 +515,15 @@ export function App() {
             />
             <span>Formula Bar</span>
           </label>
+
+          <label className="checkbox-label" title="Drag and drop column headers to reorder">
+            <input
+              type="checkbox"
+              checked={columnReorderEnabled}
+              onChange={(e) => setColumnReorderEnabled(e.target.checked)}
+            />
+            <span>Column Reordering</span>
+          </label>
         </div>
 
         {/* Data Capabilities Controls */}
@@ -808,6 +818,14 @@ export function App() {
                   : undefined,
                 onSelectionChange: setSelection,
                 onOperation: handleOperation,
+                columnReorder: columnReorderEnabled,
+                onColumnReorder: (fromIndex: number, toIndex: number) => {
+                  handleOperation({
+                    type: "column.reorder",
+                    fromIndex,
+                    toIndex,
+                  });
+                },
               };
 
               if (scenario === "standard") {

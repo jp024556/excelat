@@ -53,6 +53,12 @@ export type RangeMoveOp = {
   overwrittenValues: CellValue[][];
 };
 
+export type ColumnReorderOp = {
+  type: "column.reorder";
+  fromIndex: number;
+  toIndex: number;
+};
+
 export type BatchOp = {
   type: "batch";
   operations: GridOperation[];
@@ -66,8 +72,37 @@ export type GridOperation =
   | RowDeleteOp
   | ColumnInsertOp
   | ColumnDeleteOp
+  | ColumnReorderOp
   | RangeMoveOp
   | BatchOp;
+
+/**
+ * Moves an item in an array from fromIndex to toIndex.
+ */
+export function reorderArray<T>(list: T[], fromIndex: number, toIndex: number): T[] {
+  if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return [...list];
+  const result = [...list];
+  if (fromIndex >= result.length || toIndex >= result.length) return result;
+  const [removed] = result.splice(fromIndex, 1);
+  result.splice(toIndex, 0, removed);
+  return result;
+}
+
+/**
+ * Computes target drop index given drag origin, drop target, and cursor position ('before' | 'after').
+ */
+export function computeReorderTarget(
+  fromIdx: number,
+  toIdx: number,
+  position: "before" | "after"
+): number {
+  if (fromIdx === toIdx) return fromIdx;
+  if (fromIdx < toIdx) {
+    return position === "after" ? toIdx : toIdx - 1;
+  } else {
+    return position === "before" ? toIdx : toIdx + 1;
+  }
+}
 
 /**
  * Creates an empty matrix filled with null values for a given range.
@@ -133,6 +168,12 @@ export function invertOperation(op: GridOperation): GridOperation {
         type: "column.insert",
         columnIndex: op.columnIndex,
         columnsData: op.deletedColumnsData,
+      };
+    case "column.reorder":
+      return {
+        type: "column.reorder",
+        fromIndex: op.toIndex,
+        toIndex: op.fromIndex,
       };
     case "range.move":
       return {
@@ -273,6 +314,14 @@ export function applyOperation(data: ExcelatData, op: GridOperation): ExcelatDat
         nextData[r] = originalRow;
       }
       return nextData;
+    }
+
+    case "column.reorder": {
+      const { fromIndex, toIndex } = op;
+      return data.map((row) => {
+        if (!row) return row;
+        return reorderArray(row, fromIndex, toIndex);
+      });
     }
 
     case "range.move": {

@@ -48,6 +48,10 @@ export type CustomCellEditor = React.ComponentType<CustomCellEditorProps>;
 export interface ExcelatColumn {
   key?: string;
   header?: string;
+  /**
+   * Column header label (alias for `header`).
+   */
+  label?: string;
   width?: number;
   minWidth?: number;
   maxWidth?: number;
@@ -125,6 +129,11 @@ export type ExcelatOperation =
   | {
       type: "column.delete";
       index: number;
+    }
+  | {
+      type: "column.reorder";
+      fromIndex: number;
+      toIndex: number;
     }
   | {
       type: "batch";
@@ -265,6 +274,7 @@ export interface ExcelatRef {
   deleteRow: (index?: number) => void;
   insertColumn: (index?: number, values?: CellValue[]) => void;
   deleteColumn: (index?: number) => void;
+  reorderColumn: (fromIndex: number, toIndex: number) => void;
   undo: () => void;
   redo: () => void;
   copy: () => Promise<string | undefined>;
@@ -395,6 +405,15 @@ export interface ExcelatProps {
    * Callback fired when a column is resized.
    */
   onColumnResize?: (columnIndex: number, width: number) => void;
+  /**
+   * Whether drag-and-drop column reordering is enabled.
+   * @default true
+   */
+  columnReorder?: boolean;
+  /**
+   * Callback fired when a column is reordered via drag-and-drop or programmatic API.
+   */
+  onColumnReorder?: (fromIndex: number, toIndex: number, newColumns?: ExcelatColumn[]) => void;
   /**
    * Callback fired when a row is resized.
    */
