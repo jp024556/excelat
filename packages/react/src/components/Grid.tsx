@@ -113,8 +113,10 @@ export const Grid: React.FC<GridProps> = ({
   const isVirtual = virtualization?.isVirtual;
   const rowStart = isVirtual ? virtualization.visibleStartRow : 0;
   const rowEnd = isVirtual ? virtualization.visibleEndRow : totalRows - 1;
+  const rowCountToRender = Math.max(0, rowEnd - rowStart + 1);
+
   const rowIndices = Array.from(
-    { length: Math.max(0, rowEnd - rowStart + 1) },
+    { length: rowCountToRender },
     (_, i) => rowStart + i
   );
 

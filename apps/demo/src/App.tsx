@@ -172,6 +172,7 @@ function generateVirtualData(count = 10000): ExcelatData {
   const cities = ["Bangalore", "Delhi", "Mumbai", "Pune", "Hyderabad", "Chennai", "Seattle", "Austin"];
   const depts = ["Engineering", "Product", "Design", "Analytics", "Operations", "Sales"];
   const names = ["Alex", "Jordan", "Taylor", "Morgan", "Sam", "Chris", "Pat", "Riley", "Casey", "Avery"];
+  const dates = ["2023-01-15", "2023-04-20", "2023-07-10", "2023-10-05", "2024-02-14", "2024-05-18"];
 
   return Array.from({ length: count }, (_, i) => [
     `${names[i % names.length]} #${i + 1}`,
@@ -179,6 +180,7 @@ function generateVirtualData(count = 10000): ExcelatData {
     cities[i % cities.length],
     1200000 + ((i * 17000) % 2500000),
     i % 5 === 0 ? "Inactive" : "Active",
+    dates[i % dates.length],
     depts[i % depts.length],
   ]);
 }
@@ -242,15 +244,19 @@ export function App() {
   // Simulated server-side page data
   const pageData = useMemo(() => {
     const offset = (page - 1) * pageSize;
+    const depts = ["Engineering", "Product", "Design", "Analytics", "Finance", "Technology"];
+    const cities = ["Bangalore", "Delhi", "Mumbai", "Pune", "Hyderabad", "Chennai"];
+    const dates = ["2023-02-10", "2023-05-15", "2023-08-20", "2023-11-12", "2024-01-22"];
     return Array.from({ length: pageSize }, (_, i) => {
       const idx = offset + i;
       return [
         `Record #${idx + 1}`,
         20 + (idx % 45),
-        idx % 2 === 0 ? "Server Node A" : "Server Node B",
+        cities[idx % cities.length],
         50000 + idx * 120,
-        idx % 7 === 0 ? "Pending" : "Confirmed",
-        idx % 3 === 0 ? "Finance" : "Technology",
+        idx % 7 === 0 ? "Inactive" : "Active",
+        dates[idx % dates.length],
+        depts[idx % depts.length],
       ];
     });
   }, [page]);
@@ -807,6 +813,7 @@ export function App() {
               if (scenario === "standard") {
                 return (
                   <Excelat
+                    key="standard"
                     ref={gridRef}
                     data={data}
                     columns={TABLE_COLUMNS}
@@ -840,6 +847,7 @@ export function App() {
               if (scenario === "virtualization") {
                 return (
                   <Excelat
+                    key="virtualization"
                     ref={gridRef}
                     data={virtualData}
                     virtualization
@@ -852,6 +860,7 @@ export function App() {
               if (scenario === "pagination") {
                 return (
                   <Excelat
+                    key="pagination"
                     ref={gridRef}
                     data={pageData}
                     pagination={{
@@ -871,6 +880,7 @@ export function App() {
               if (scenario === "infinite") {
                 return (
                   <Excelat
+                    key="infinite"
                     ref={gridRef}
                     data={infiniteRows}
                     virtualization

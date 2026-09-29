@@ -114,15 +114,13 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
     const [internalData, setInternalData] = useState<ExcelatData>(
       () => controlledData || []
     );
-    const prevControlledDataRef = useRef(controlledData);
+    const [prevControlledData, setPrevControlledData] = useState(controlledData);
 
-    // Sync internal state when controlledData changes from parent
-    useEffect(() => {
-      if (controlledData !== undefined && controlledData !== prevControlledDataRef.current) {
-        prevControlledDataRef.current = controlledData;
-        setInternalData(controlledData);
-      }
-    }, [controlledData]);
+    // Sync internal state immediately during render when controlledData changes from parent
+    if (controlledData !== undefined && controlledData !== prevControlledData) {
+      setPrevControlledData(controlledData);
+      setInternalData(controlledData);
+    }
 
     const currentData = internalData;
     const maxDataCols = currentData.reduce(
