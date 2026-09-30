@@ -488,5 +488,11 @@ export interface ExcelatProps {
    * Whether the grid is read-only.
    */
   readOnly?: boolean;
+  /**
+   * Theme variant for the grid: "light", "dark", or "system".
+   * Automatically adapts to ancestor .dark class when omitted.
+   * @default "light"
+   */
+  theme?: "light" | "dark" | "system";
 }
 

@@ -73,7 +73,7 @@ describe("Excelat - Virtualization, Pagination & Operations", () => {
 
       const bar = container.querySelector(".excelat-pagination-bar");
       expect(bar).not.toBeNull();
-      expect(bar?.textContent).toContain("Showing 1–25 of 100");
+      expect(bar?.textContent).toContain("Showing 1 - 25 of 100");
       expect(bar?.textContent).toContain("Page 1 of 4");
 
       // First & Prev buttons should be disabled on page 1

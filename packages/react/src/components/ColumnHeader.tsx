@@ -3,6 +3,7 @@ import { getColumnLabel } from "../model/dataModel";
 import { ExcelatColumn, SortRule, Filter, FilterOperator } from "../model/types";
 import { resolveColumnIndex } from "../model/sorting";
 import { computeReorderTarget } from "../model/operations";
+import { SortIcon, FilterIcon } from "./icons";
 
 export interface ColumnHeaderProps {
   totalCols: number;
@@ -261,11 +262,7 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = React.memo(
                         : "Sort column"
                     }
                   >
-                    {sortRule?.direction === "asc"
-                      ? "▲"
-                      : sortRule?.direction === "desc"
-                      ? "▼"
-                      : "⇅"}
+                    <SortIcon direction={sortRule?.direction} size={13} />
                     {sortRules.length > 1 && sortRuleIndex !== -1 && (
                       <span className="excelat-sort-badge">
                         {sortRuleIndex + 1}
@@ -285,15 +282,7 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = React.memo(
                     title="Filter column"
                     onClick={(e) => handleOpenFilter(e, col)}
                   >
-                    <svg
-                      viewBox="0 0 16 16"
-                      width="11"
-                      height="11"
-                      fill="currentColor"
-                      aria-hidden="true"
-                    >
-                      <path d="M1.5 2.5a.5.5 0 0 1 .5-.5h12a.5.5 0 0 1 .374.832L9.5 8.243V13.5a.5.5 0 0 1-.74.437l-2-1A.5.5 0 0 1 6.5 12.5V8.243L1.626 2.832A.5.5 0 0 1 1.5 2.5z" />
-                    </svg>
+                    <FilterIcon active={isFilterActive} size={13} />
                   </button>
                 )}
               </div>

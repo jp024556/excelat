@@ -85,6 +85,15 @@ export { FormulaBar } from "./components/FormulaBar";
 export { Pagination } from "./components/Pagination";
 export { GridToolbar } from "./components/Toolbar";
 export { GroupRow } from "./components/GroupRow";
+export {
+  SortIcon,
+  FilterIcon,
+  ChevronRightIcon,
+  ChevronLeftIcon,
+  ChevronRightNavIcon,
+  ChevronsLeftIcon,
+  ChevronsRightIcon,
+} from "./components/icons";
 export { useVirtualization } from "./hooks/useVirtualization";
 export type { VirtualizationState } from "./hooks/useVirtualization";
 

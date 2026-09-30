@@ -138,35 +138,61 @@ export function useVirtualization({
 
   // Row virtualization calculation
   const { scrollTop, scrollLeft, clientHeight, clientWidth } = scrollMetrics;
+  const effectiveClientHeight = Math.max(100, Math.min(clientHeight || 600, 2400));
+  const maxRowsToRender = 120; // Hard ceiling to guarantee high-performance 60fps rendering
 
-  let currentTop = 0;
-  let startRow = 0;
-  let endRow = totalRows - 1;
-
-  // Binary or linear search through rows
-  for (let r = 0; r < totalRows; r++) {
-    const h = rowHeights[r] ?? defaultRowHeight;
-    const rowBottom = currentTop + h;
-    if (rowBottom >= scrollTop && startRow === 0) {
-      startRow = r;
-    }
-    if (currentTop <= scrollTop + clientHeight) {
-      endRow = r;
-    }
-    currentTop += h;
-  }
-
-  const visibleStartRow = Math.max(0, startRow - rowOverscan);
-  const visibleEndRow = Math.min(totalRows - 1, endRow + rowOverscan);
-
+  const hasCustomRowHeights = Object.keys(rowHeights).length > 0;
+  let visibleStartRow = 0;
+  let visibleEndRow = 0;
   let topSpacerHeight = 0;
-  for (let r = 0; r < visibleStartRow; r++) {
-    topSpacerHeight += rowHeights[r] ?? defaultRowHeight;
-  }
-
   let bottomSpacerHeight = 0;
-  for (let r = visibleEndRow + 1; r < totalRows; r++) {
-    bottomSpacerHeight += rowHeights[r] ?? defaultRowHeight;
+
+  if (!hasCustomRowHeights) {
+    // Fast O(1) uniform height calculation
+    const rawStart = Math.max(0, Math.floor(scrollTop / defaultRowHeight));
+    const rawEnd = Math.min(
+      totalRows - 1,
+      Math.ceil((scrollTop + effectiveClientHeight) / defaultRowHeight)
+    );
+
+    visibleStartRow = Math.max(0, rawStart - rowOverscan);
+    visibleEndRow = Math.min(
+      totalRows - 1,
+      Math.min(rawEnd + rowOverscan, visibleStartRow + maxRowsToRender)
+    );
+
+    topSpacerHeight = visibleStartRow * defaultRowHeight;
+    bottomSpacerHeight = Math.max(0, (totalRows - 1 - visibleEndRow) * defaultRowHeight);
+  } else {
+    // Linear scan when custom row heights are present
+    let currentTop = 0;
+    let startRow = 0;
+    let endRow = totalRows - 1;
+
+    for (let r = 0; r < totalRows; r++) {
+      const h = rowHeights[r] ?? defaultRowHeight;
+      const rowBottom = currentTop + h;
+      if (rowBottom >= scrollTop && startRow === 0) {
+        startRow = r;
+      }
+      if (currentTop <= scrollTop + effectiveClientHeight) {
+        endRow = r;
+      }
+      currentTop += h;
+    }
+
+    visibleStartRow = Math.max(0, startRow - rowOverscan);
+    visibleEndRow = Math.min(
+      totalRows - 1,
+      Math.min(endRow + rowOverscan, visibleStartRow + maxRowsToRender)
+    );
+
+    for (let r = 0; r < visibleStartRow; r++) {
+      topSpacerHeight += rowHeights[r] ?? defaultRowHeight;
+    }
+    for (let r = visibleEndRow + 1; r < totalRows; r++) {
+      bottomSpacerHeight += rowHeights[r] ?? defaultRowHeight;
+    }
   }
 
   // Column virtualization: enabled if totalCols > 25
@@ -177,31 +203,49 @@ export function useVirtualization({
   let rightSpacerWidth = 0;
 
   if (isVirtualCols) {
-    let currentLeft = 0;
-    let startCol = 0;
-    let endCol = totalCols - 1;
+    const effectiveClientWidth = Math.max(100, Math.min(clientWidth || 1000, 3840));
+    const hasCustomColWidths =
+      Object.keys(columnWidths).length > 0 ||
+      (columns && columns.some((c) => c.width !== undefined));
 
-    for (let c = 0; c < totalCols; c++) {
-      const w = columnWidths[c] ?? columns?.[c]?.width ?? defaultColWidth;
-      const colRight = currentLeft + w;
-      if (colRight >= scrollLeft && startCol === 0) {
-        startCol = c;
+    if (!hasCustomColWidths) {
+      const rawStart = Math.max(0, Math.floor(scrollLeft / defaultColWidth));
+      const rawEnd = Math.min(
+        totalCols - 1,
+        Math.ceil((scrollLeft + effectiveClientWidth) / defaultColWidth)
+      );
+
+      visibleStartCol = Math.max(0, rawStart - colOverscan);
+      visibleEndCol = Math.min(totalCols - 1, rawEnd + colOverscan);
+      leftSpacerWidth = visibleStartCol * defaultColWidth;
+      rightSpacerWidth = Math.max(0, (totalCols - 1 - visibleEndCol) * defaultColWidth);
+    } else {
+      let currentLeft = 0;
+      let startCol = 0;
+      let endCol = totalCols - 1;
+
+      for (let c = 0; c < totalCols; c++) {
+        const w = columnWidths[c] ?? columns?.[c]?.width ?? defaultColWidth;
+        const colRight = currentLeft + w;
+        if (colRight >= scrollLeft && startCol === 0) {
+          startCol = c;
+        }
+        if (currentLeft <= scrollLeft + effectiveClientWidth) {
+          endCol = c;
+        }
+        currentLeft += w;
       }
-      if (currentLeft <= scrollLeft + clientWidth) {
-        endCol = c;
+
+      visibleStartCol = Math.max(0, startCol - colOverscan);
+      visibleEndCol = Math.min(totalCols - 1, endCol + colOverscan);
+
+      for (let c = 0; c < visibleStartCol; c++) {
+        leftSpacerWidth += columnWidths[c] ?? columns?.[c]?.width ?? defaultColWidth;
       }
-      currentLeft += w;
-    }
 
-    visibleStartCol = Math.max(0, startCol - colOverscan);
-    visibleEndCol = Math.min(totalCols - 1, endCol + colOverscan);
-
-    for (let c = 0; c < visibleStartCol; c++) {
-      leftSpacerWidth += columnWidths[c] ?? columns?.[c]?.width ?? defaultColWidth;
-    }
-
-    for (let c = visibleEndCol + 1; c < totalCols; c++) {
-      rightSpacerWidth += columnWidths[c] ?? columns?.[c]?.width ?? defaultColWidth;
+      for (let c = visibleEndCol + 1; c < totalCols; c++) {
+        rightSpacerWidth += columnWidths[c] ?? columns?.[c]?.width ?? defaultColWidth;
+      }
     }
   }
 

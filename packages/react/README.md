@@ -1,14 +1,28 @@
-# Excelat
+<p align="center">
+  <img src="logo.svg" width="88" height="88" alt="Excelat logo" />
+</p>
 
-> **Excel-like tables for modern web applications.**  
-> Lightweight, lightning fast, and zero external grid dependencies.
+<h1 align="center">Excelat</h1>
 
-[![npm version](https://img.shields.io/npm/v/@excelat/react.svg)](https://www.npmjs.com/package/@excelat/react)
-[![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![bundle size](https://img.shields.io/badge/bundle%20size-13.8%20kB%20gzipped-success.svg)](https://www.npmjs.com/package/@excelat/react)
-[![tests](https://img.shields.io/badge/tests-57%20passing-brightgreen.svg)]()
+<p align="center">
+  <strong>Excel-like tables and high-performance data grids for modern web applications.</strong><br />
+  Lightweight, lightning fast, and zero external grid dependencies.
+</p>
 
-Excelat delivers the rich spreadsheet interaction users expect — cell and range selection, keyboard navigation, copy/paste, inline editing, formula bar, drag-fill, range-moving, undo/redo, row/column resizing, and first-class virtualization — inside your React app **without forcing you to adopt an enormous, opinionated grid framework.**
+<p align="center">
+  <a href="https://www.npmjs.com/package/@excelat/react"><img src="https://img.shields.io/npm/v/@excelat/react.svg" alt="npm version" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="license" /></a>
+  <a href="https://bundlephobia.com/package/@excelat/react"><img src="https://img.shields.io/badge/bundle%20size-19.1%20kB%20gzipped-success.svg" alt="bundle size" /></a>
+  <img src="https://img.shields.io/badge/tests-94%20passing-brightgreen.svg" alt="tests" />
+  <a href="https://statpio.com"><img src="https://img.shields.io/badge/production-Statpio-10b981.svg" alt="Used on Statpio" /></a>
+  <a href="https://excelat.onstatpio.com"><img src="https://img.shields.io/badge/docs-excelat.onstatpio.com-blue.svg" alt="Documentation" /></a>
+</p>
+
+> **Used in Production:** Excelat is actively used on [Statpio](https://statpio.com) for real-time analytics, financial metrics, and high-performance grid dashboards.
+
+**[Read the Documentation](https://excelat.onstatpio.com)** | **[Live Interactive Demos](https://excelat.onstatpio.com/#/overview)**
+
+Excelat delivers the rich spreadsheet interaction users expect (cell and range selection, keyboard navigation, copy/paste, inline editing, formula bar, drag-fill, range-moving, undo/redo, row/column resizing, and first-class virtualization) inside your React app **without forcing you to adopt an enormous, opinionated grid framework.**
 
 ```bash
 npm install @excelat/react
@@ -36,27 +50,33 @@ export function App() {
 - [Why Excelat?](#why-excelat)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
-- [Data Loading Modes](#data-loading-modes)
+- [Core Principle: Presentation vs Capability](#core-principle-presentation-vs-capability)
+- [Data Loading & Pagination](#data-loading--pagination)
   - [1. Simple Local Data](#1-simple-local-data)
   - [2. Large Datasets with Virtualization](#2-large-datasets-with-virtualization)
-  - [3. Controlled Server-Side Pagination](#3-controlled-server-side-pagination)
-  - [4. Infinite / Incremental Loading](#4-infinite--incremental-loading)
+  - [3. Controlled Pagination (Client & Server)](#3-controlled-pagination-client--server)
+  - [4. Custom Pagination UI](#4-custom-pagination-ui)
+  - [5. Infinite / Incremental Loading](#5-infinite--incremental-loading)
+- [Sorting (Client & Server)](#sorting-client--server)
+- [Filtering (Client & Server)](#filtering-client--server)
+- [Row Grouping](#row-grouping)
+- [Custom Toolbar](#custom-toolbar)
 - [Visual Modes & Styling](#visual-modes--styling)
   - [Spreadsheet Mode vs Normal Table Mode](#spreadsheet-mode-vs-normal-table-mode)
   - [Configurable Selection Styles](#configurable-selection-styles)
+  - [Typography & Natural Font Inheritance](#typography--natural-font-inheritance)
 - [Formula Bar](#formula-bar)
 - [Mutations & Persistence (`onOperation`)](#mutations--persistence-onoperation)
   - [Granular Operations Model](#granular-operations-model)
   - [Batch Operations](#batch-operations)
-  - [Persistence Strategies (Immediate, Debounced, Batch, Optimistic)](#persistence-strategies)
-- [Custom Cell Types, Rendering & Editing](#custom-cell-types-rendering--editing)
-  - [Custom Rendering (`render`)](#custom-rendering-render)
-  - [Custom Cell Editors (`editor`)](#custom-cell-editors-editor)
-  - [Separation of Concerns & Combinations](#separation-of-concerns--combinations)
+  - [Persistence Strategies](#persistence-strategies)
+- [Custom Cell Rendering & Column Types](#custom-cell-rendering--column-types)
 - [Keyboard Navigation & Shortcuts](#keyboard-navigation--shortcuts)
 - [Imperative Ref API](#imperative-ref-api)
+- [Architecture: Strict Separation of State](#architecture-strict-separation-of-state)
+- [Feature Composition](#feature-composition)
 - [Complete API Reference](#complete-api-reference)
-- [Architecture & Philosophy](#architecture--philosophy)
+- [Contributing & Development](#contributing--development)
 - [License](#license)
 
 ---
@@ -64,6 +84,7 @@ export function App() {
 ## Why Excelat?
 
 * **Zero External Grid Dependencies:** Built from the ground up for React and pure CSS. No AG Grid, no Handsontable, no heavy canvas layers.
+* **Production Battle-Tested:** Powers interactive data grids and real-time metric analysis on [Statpio](https://statpio.com).
 * **Excellent Developer Experience (DX):** Sensible defaults for everything. Zero-config `<Excelat data={data} />` works right out of the box.
 * **Infrastructure & Backend Agnostic:** Excelat **never** forces a backend or data-fetching model onto your app. You own your API queries (REST, GraphQL, Supabase, Firebase, WebSockets).
 * **Smooth Virtualization:** Render 10,000+ rows and 100+ columns at 60 FPS while keeping selection, editing, fill-handle, and auto-scrolling 100% accurate.
@@ -118,7 +139,41 @@ export default function Demo() {
 
 ---
 
-## Data Loading Modes
+## Core Principle: Presentation vs Capability
+
+> **`mode="spreadsheet"` and `mode="table"` are visual/UX presentation modes, not capability boundaries.**
+
+All Excelat capabilities work identically in both modes unless there is a specific visual reason otherwise.
+
+For example, this is completely valid:
+
+```tsx
+<Excelat
+  mode="spreadsheet"
+  data={data}
+  sorting={{ mode: "client" }}
+  filtering={{ mode: "client" }}
+  grouping={{ columns: ["department"] }}
+/>
+```
+
+And the exact same capabilities work identically in table mode:
+
+```tsx
+<Excelat
+  mode="table"
+  data={data}
+  sorting={{ mode: "client" }}
+  filtering={{ mode: "client" }}
+  grouping={{ columns: ["department"] }}
+/>
+```
+
+The difference between modes is primarily **presentation and default UI behavior** (such as row numbers, column letters, and selection accents), not what the underlying grid is capable of doing.
+
+---
+
+## Data Loading & Pagination
 
 Excelat accommodates all modern data loading patterns without complicating the basic API:
 
@@ -157,57 +212,75 @@ You can optionally configure overscan buffers:
 
 ---
 
-### 3. Controlled Server-Side Pagination
-For datasets backed by remote databases where data is loaded in pages.
+### 3. Controlled Pagination (Client & Server)
 
-**Excelat does NOT fetch data itself.** The application owns the query, loading state, and error handling. Excelat only displays the current page and informs you when the user changes pages:
+Excelat supports both client-side row slicing and server-side controlled pagination.
 
+**Excelat never makes API or database requests itself.** The consuming application owns data fetching, persistent storage, and query parameters. Excelat simply displays the page data and emits state transitions through callbacks.
+
+#### Server-Side Pagination
 ```tsx
-import { useState, useEffect } from "react";
-import { Excelat, ExcelatData } from "@excelat/react";
-
-export function PaginatedGrid() {
-  const [rows, setRows] = useState<ExcelatData>([]);
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const pageSize = 50;
-  const totalRows = 10000;
-
-  useEffect(() => {
-    async function loadData() {
-      setLoading(true);
-      try {
-        const response = await fetch(`/api/records?page=${page}&limit=${pageSize}`);
-        const data = await response.json();
-        setRows(data);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadData();
-  }, [page]);
-
-  return (
-    <Excelat
-      data={rows}
-      pagination={{
-        page,
-        pageSize,
-        total: totalRows,
-      }}
-      loading={loading}
-      onPageChange={(nextPage) => setPage(nextPage)}
-    />
-  );
-}
+<Excelat
+  data={users}
+  pagination={{
+    mode: "server",
+    page: 1,
+    pageSize: 50,
+    total: 10000,
+  }}
+  onPageChange={(page) => loadUsers(page)}
+  onPageSizeChange={(pageSize) => setPageSize(pageSize)}
+/>
 ```
 
-* **Automatic Row Offset:** Row numbers automatically reflect the active page (e.g. Page 2 displays rows `51, 52, 53...`).
-* **Built-in Accessible Controls:** First, Previous, Page X of Y, Next, and Last buttons with disabled states and loading indicators.
+#### Client-Side Controlled Pagination
+```tsx
+<Excelat
+  data={allUsers}
+  pagination={{
+    mode: "client",
+    page: 1,
+    pageSize: 25,
+  }}
+/>
+```
+
+* Works seamlessly in both `spreadsheet` and `table` visual modes.
+* Changing `page` or `pageSize` preserves selection, column widths, and grid stability.
+* Automatically works with virtualization for ultra-fast rendering.
 
 ---
 
-### 4. Infinite / Incremental Loading
+### 4. Custom Pagination UI
+
+Developers can provide their own custom pagination UI via the `renderPagination` render-prop slot without being locked into a predefined layout:
+
+```tsx
+<Excelat
+  data={users}
+  pagination={{
+    mode: "server",
+    page: 1,
+    pageSize: 20,
+    total: 200,
+  }}
+  renderPagination={({ page, totalPages, total, onPageChange, onPageSizeChange }) => (
+    <div className="my-custom-pagination">
+      <span>Page {page} of {totalPages} ({total} records)</span>
+      <button disabled={page <= 1} onClick={() => onPageChange(page - 1)}>Prev</button>
+      <button disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>Next</button>
+      <select onChange={(e) => onPageSizeChange?.(Number(e.target.value))}>
+        <option value={20}>20 per page</option>
+        <option value={50}>50 per page</option>
+      </select>
+    </div>
+  )}
+/>
+```
+
+---
+
+### 5. Infinite / Incremental Loading
 For large datasets loaded dynamically as the user scrolls:
 
 ```tsx
@@ -250,6 +323,200 @@ export function InfiniteGrid() {
 * Detects when the user scrolls near the end of the loaded dataset.
 * Prevents duplicate requests while `loading === true`.
 * Preserves active cell coordinates and selections as new rows are appended.
+
+---
+
+## Sorting (Client & Server)
+
+Excelat supports single-column and multi-column sorting in both client and server modes with clear visual sort indicators (`▲`/`▼`) in header cells.
+
+### Client-Side Sorting
+Excelat handles sorting internally using appropriate comparison semantics (text, number, date, boolean; `null` values placed stably at the bottom):
+
+```tsx
+<Excelat
+  data={users}
+  columns={columns}
+  sorting={{
+    mode: "client",
+    sort: [
+      { column: "department", direction: "asc" },
+      { column: "age", direction: "desc" },
+    ],
+    multiColumn: true,
+  }}
+/>
+```
+
+Clicking a sortable column header cycles through: **Unsorted → Ascending → Descending → Unsorted**. Holding <kbd>Shift</kbd> toggles multi-column sorting.
+
+### Server-Side Sorting
+In server mode, Excelat emits sorting state through callbacks and preserves the raw data order, leaving remote querying to the application:
+
+```tsx
+<Excelat
+  data={users}
+  sorting={{
+    mode: "server",
+    sort: currentSortRules,
+  }}
+  onSortChange={(rules) => fetchSortedUsers(rules)}
+/>
+```
+
+---
+
+## Filtering (Client & Server)
+
+Excelat provides a generic, decoupled filter model rather than tying your application to a specific backend dialect.
+
+```ts
+export type Filter = {
+  column: string | number;
+  operator: FilterOperator;
+  value: unknown;
+};
+
+export type FilterOperator =
+  | "contains"
+  | "notContains"
+  | "equals"
+  | "notEquals"
+  | "startsWith"
+  | "endsWith"
+  | "gt"
+  | "gte"
+  | "lt"
+  | "lte"
+  | "isEmpty"
+  | "isNotEmpty";
+```
+
+### Client-Side Filtering
+```tsx
+<Excelat
+  data={users}
+  columns={columns}
+  filtering={{
+    mode: "client",
+    filters: [
+      { column: "status", operator: "equals", value: "Active" },
+      { column: "age", operator: "gte", value: 25 },
+    ],
+  }}
+/>
+```
+
+Each column header renders a filter trigger icon opening an accessible popover to select operators, input values, and apply/clear filters.
+
+### Server-Side Filtering
+```tsx
+<Excelat
+  data={users}
+  filtering={{
+    mode: "server",
+    filters: activeFilters,
+  }}
+  onFilterChange={(filters) => fetchFilteredUsers(filters)}
+/>
+```
+
+---
+
+## Row Grouping
+
+Excelat includes basic row grouping by one or multiple columns. Grouped rows display non-editable group header rows with expand/collapse toggles and item counts.
+
+```tsx
+<Excelat
+  data={users}
+  columns={columns}
+  grouping={{
+    columns: ["department"], // or multi-column: ["department", "role"]
+    defaultExpanded: true,
+  }}
+  onGroupChange={(expandedKeys) => console.log(expandedKeys)}
+/>
+```
+
+Example display:
+```text
+▼ Department: Engineering (2)
+    John    28   Engineering
+    Sarah   31   Engineering
+▼ Department: Product (2)
+    Mike    35   Product
+    Lisa    29   Product
+```
+
+* **Fully Composable:** Grouping coexists seamlessly with sorting, filtering, selection, keyboard navigation, virtualization, and custom cell renderers/editors.
+* **Non-Editable Headers:** Group headers cannot be edited and double-clicking or pressing <kbd>Space</kbd>/<kbd>Enter</kbd> toggles their expand/collapse state.
+* **Data Row Mapping:** In-place cell edits target the true underlying matrix rows regardless of grouping hierarchy.
+
+---
+
+## Custom Toolbar
+
+Excelat provides a first-class custom toolbar extension point accepting either a static React node or a render function with rich grid state and actions:
+
+```tsx
+<Excelat
+  data={users}
+  toolbar={({ selection, canUndo, canRedo, undo, redo, insertRow, deleteRows, clearSelection }) => (
+    <div className="custom-grid-toolbar">
+      <button disabled={!canUndo} onClick={undo}>Undo</button>
+      <button disabled={!canRedo} onClick={redo}>Redo</button>
+      <button onClick={() => insertRow()}>+ Add Row</button>
+      <button onClick={() => deleteRows()}>Delete Selected</button>
+      <button onClick={clearSelection}>Clear Selection</button>
+    </div>
+  )}
+/>
+```
+
+### Available Toolbar Props
+* `selection`: Current active `CellRange` coordinates
+* `activeCell`: Current cursor `CellCoord`
+* `selectedRows`: Array of selected row indices
+* `selectedCols`: Array of selected column indices
+* `canUndo`: Boolean whether undo is available
+* `canRedo`: Boolean whether redo is available
+* `undo()` / `redo()`: Trigger history operations
+* `insertRow(index?, values?)`: Insert row at index or below selection
+* `deleteRows(indices?)`: Delete specified rows or selected rows
+* `insertColumn(index?, values?)`: Insert column
+* `deleteColumns(indices?)`: Delete columns
+* `copy()`, `cut()`, `paste()`: Clipboard operations
+* `clearSelection()`: Deselect all cells
+
+---
+
+## Architecture: Strict Separation of State
+
+Excelat maintains a strict architectural boundary between **grid state** and **data persistence**:
+
+| Excelat Owns | Consuming Application Owns |
+| --- | --- |
+| Grid rendering & layout | API & network requests (fetch, axios, WebSocket) |
+| Cell selection & range movement | Database / persistence (Postgres, Supabase, Firebase) |
+| Inline editing lifecycle & typing | Query parameters (page, sort, filter parameters) |
+| Keyboard navigation & focus | Authentication & authorization |
+| Clipboard TSV serialization & parsing | Business rules & data validation |
+| Undo/redo history stack | Optimistic updates & server rollback |
+| Dynamic viewport virtualization | Data schema & relations |
+| Grouping expand/collapse hierarchy | |
+
+---
+
+## Feature Composition
+
+All Excelat capabilities are designed to compose cleanly without artificial boundaries:
+
+* **Sorting + Filtering:** Filter rows locally or on server, then sort the filtered dataset stably.
+* **Sorting + Filtering + Pagination:** Local pipeline filters first, sorts second, then pages the visible window with accurate total count summaries.
+* **Grouping + Sorting/Filtering:** Rows are filtered and sorted before being nested into expandable group hierarchies.
+* **Virtualization + Server Data:** Large server-paged or infinite datasets render with 60 FPS virtualization.
+* **Spreadsheet Mode + All Features:** Sorting, filtering, grouping, pagination, and custom toolbars work identically in `mode="spreadsheet"` and `mode="table"`.
 
 ---
 
@@ -300,6 +567,25 @@ Control the visual treatment of the active cell and selected ranges using `selec
   // selectionStyle="subtle" // Clean blue boundary for web application tables
   // selectionStyle="none"   // Visual focus hidden; full keyboard/selection state works internally
 />
+```
+
+---
+
+### Typography & Natural Font Inheritance
+
+> **Principle:** *Excelat owns grid behavior and structure; the consuming application owns typography.*
+
+Excelat does **not bundle, import, or force any font family** (no hardcoded Arial, Inter, Roboto, or system fonts). The root `.excelat` element uses `font-family: inherit;`, so the grid seamlessly and automatically assumes whatever font family your parent application or container specifies.
+
+* **Internal Consistency:** Headers, cells, row numbers, column letters, formula bar, name box, cell editors, custom dropdown editors, and pagination controls all inherit the root font.
+* **No `fontFamily` Prop in V0.1:** Typography is configured cleanly through CSS without adding runtime overhead or non-standard props.
+* **Easy CSS Overrides:** Consuming applications can override typography normally via standard CSS:
+
+```css
+/* Custom font override on Excelat container */
+.my-table .excelat {
+  font-family: "Inter", -apple-system, sans-serif;
+}
 ```
 
 ---
@@ -715,9 +1001,18 @@ export interface ExcelatRef {
 | `columns` | `number \| ExcelatColumn[]` | `26` | Total number of columns or array of custom column definitions. |
 | `rows` | `number` | `100` | Fallback number of rows to render if `data` is empty. |
 | `virtualization` | `boolean \| VirtualizationConfig` | `false` | Enables row and column virtualization for large datasets. |
-| `pagination` | `PaginationConfig` | `undefined` | Controlled pagination settings `{ page, pageSize, total }`. |
-| `loading` | `boolean` | `false` | Displays a subtle loading banner during pagination or infinite fetching. |
+| `sorting` | `SortingConfig` | `undefined` | Client-side or server-side sorting `{ mode: "client" \| "server", sort?: SortRule[], multiColumn?: boolean }`. |
+| `onSortChange` | `(rules: SortRule[]) => void` | `undefined` | Callback fired when sort rules change (via header click or API). |
+| `filtering` | `FilteringConfig` | `undefined` | Client-side or server-side filtering `{ mode: "client" \| "server", filters?: Filter[] }`. |
+| `onFilterChange` | `(filters: Filter[]) => void` | `undefined` | Callback fired when filter criteria change. |
+| `grouping` | `GroupingConfig` | `undefined` | Row grouping settings `{ columns: (string \| number)[], defaultExpanded?: boolean, expanded?: Record<string, boolean> }`. |
+| `onGroupChange` | `(expandedKeys: string[]) => void` | `undefined` | Callback fired when group headers expand or collapse. |
+| `toolbar` | `React.ReactNode \| ((props: ToolbarProps) => React.ReactNode)` | `undefined` | First-class custom toolbar extension slot with full access to grid state and actions. |
+| `pagination` | `PaginationConfig` | `undefined` | Controlled pagination settings `{ mode?: "client" \| "server", page: number, pageSize: number, total?: number }`. |
 | `onPageChange` | `(nextPage: number) => void` | `undefined` | Callback fired when the user navigates between pages. |
+| `onPageSizeChange` | `(pageSize: number) => void` | `undefined` | Callback fired when the user selects a new page size. |
+| `renderPagination` | `(props: PaginationRenderProps) => React.ReactNode` | `undefined` | Custom pagination UI render-prop slot. |
+| `loading` | `boolean` | `false` | Displays a subtle loading banner during pagination or infinite fetching. |
 | `hasMore` | `boolean` | `undefined` | Used with infinite loading to signal more records are available. |
 | `onLoadMore` | `() => void` | `undefined` | Callback fired when scrolling near the bottom of loaded rows. |
 | `onOperation` | `(op: ExcelatOperation) => void` | `undefined` | Callback for granular developer mutations to connect persistence. |
@@ -751,7 +1046,7 @@ Excelat
 └── HistoryManager        # Atomic GridOperation stack & public ExcelatOperation dispatcher
 ```
 
-1. **DX First:** `<Excelat data={data} />` requires zero setup. Opt into advanced capabilities (`virtualization`, `pagination`, `onOperation`, custom `render`, custom `editor`) only when you need them.
+1. **DX First:** `<Excelat data={data} />` requires zero setup. Opt into advanced capabilities (`virtualization`, `pagination`, `onOperation`) only when you need them.
 2. **Framework Freedom:** Excelat never assumes what backend or transport protocol you use.
 3. **No Heavy Dependencies:** No canvas black-boxes. Fully accessible HTML tables that respect standard browser CSS styling, printing, and accessibility tools.
 
@@ -761,7 +1056,7 @@ Excelat
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/your-username/excelat.git
+git clone https://github.com/excelat/excelat.git
 cd excelat
 
 # 2. Install dependencies

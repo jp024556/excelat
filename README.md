@@ -1,14 +1,28 @@
-# Excelat
+<p align="center">
+  <img src="logo.svg" width="88" height="88" alt="Excelat logo" />
+</p>
 
-> **Excel-like tables for modern web applications.**  
-> Lightweight, lightning fast, and zero external grid dependencies.
+<h1 align="center">Excelat</h1>
 
-[![npm version](https://img.shields.io/npm/v/@excelat/react.svg)](https://www.npmjs.com/package/@excelat/react)
-[![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![bundle size](https://img.shields.io/badge/bundle%20size-14.5%20kB%20gzipped-success.svg)](https://www.npmjs.com/package/@excelat/react)
-[![tests](https://img.shields.io/badge/tests-82%20passing-brightgreen.svg)]()
+<p align="center">
+  <strong>Excel-like tables and high-performance data grids for modern web applications.</strong><br />
+  Lightweight, lightning fast, and zero external grid dependencies.
+</p>
 
-Excelat delivers the rich spreadsheet interaction users expect — cell and range selection, keyboard navigation, copy/paste, inline editing, formula bar, drag-fill, range-moving, undo/redo, row/column resizing, and first-class virtualization — inside your React app **without forcing you to adopt an enormous, opinionated grid framework.**
+<p align="center">
+  <a href="https://www.npmjs.com/package/@excelat/react"><img src="https://img.shields.io/npm/v/@excelat/react.svg" alt="npm version" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="license" /></a>
+  <a href="https://bundlephobia.com/package/@excelat/react"><img src="https://img.shields.io/badge/bundle%20size-19.1%20kB%20gzipped-success.svg" alt="bundle size" /></a>
+  <img src="https://img.shields.io/badge/tests-94%20passing-brightgreen.svg" alt="tests" />
+  <a href="https://statpio.com"><img src="https://img.shields.io/badge/production-Statpio-10b981.svg" alt="Used on Statpio" /></a>
+  <a href="https://excelat.onstatpio.com"><img src="https://img.shields.io/badge/docs-excelat.onstatpio.com-blue.svg" alt="Documentation" /></a>
+</p>
+
+> **Used in Production:** Excelat is actively used on [Statpio](https://statpio.com) for real-time analytics, financial metrics, and high-performance grid dashboards.
+
+**[Read the Documentation](https://excelat.onstatpio.com)** | **[Live Interactive Demos](https://excelat.onstatpio.com/#/overview)**
+
+Excelat delivers the rich spreadsheet interaction users expect (cell and range selection, keyboard navigation, copy/paste, inline editing, formula bar, drag-fill, range-moving, undo/redo, row/column resizing, and first-class virtualization) inside your React app **without forcing you to adopt an enormous, opinionated grid framework.**
 
 ```bash
 npm install @excelat/react
@@ -62,6 +76,7 @@ export function App() {
 - [Architecture: Strict Separation of State](#architecture-strict-separation-of-state)
 - [Feature Composition](#feature-composition)
 - [Complete API Reference](#complete-api-reference)
+- [Contributing & Development](#contributing--development)
 - [License](#license)
 
 ---
@@ -69,6 +84,7 @@ export function App() {
 ## Why Excelat?
 
 * **Zero External Grid Dependencies:** Built from the ground up for React and pure CSS. No AG Grid, no Handsontable, no heavy canvas layers.
+* **Production Battle-Tested:** Powers interactive data grids and real-time metric analysis on [Statpio](https://statpio.com).
 * **Excellent Developer Experience (DX):** Sensible defaults for everything. Zero-config `<Excelat data={data} />` works right out of the box.
 * **Infrastructure & Backend Agnostic:** Excelat **never** forces a backend or data-fetching model onto your app. You own your API queries (REST, GraphQL, Supabase, Firebase, WebSockets).
 * **Smooth Virtualization:** Render 10,000+ rows and 100+ columns at 60 FPS while keeping selection, editing, fill-handle, and auto-scrolling 100% accurate.
@@ -1040,7 +1056,7 @@ Excelat
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/your-username/excelat.git
+git clone https://github.com/excelat/excelat.git
 cd excelat
 
 # 2. Install dependencies

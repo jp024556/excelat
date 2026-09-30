@@ -1,7 +1,7 @@
 {
   "name": "@excelat/react",
   "version": "0.1.0",
-  "description": "Excel-like tables for modern web apps",
+  "description": "High-performance, keyboard-first React spreadsheet and data grid with zero external dependencies",
   "author": "Excelat",
   "license": "MIT",
   "type": "module",
@@ -18,12 +18,40 @@
     "./style.css": "./dist/style.css"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE",
+    "logo.svg"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/excelat/excelat.git",
+    "directory": "packages/react"
+  },
+  "homepage": "https://excelat.onstatpio.com",
+  "bugs": {
+    "url": "https://github.com/excelat/excelat/issues"
+  },
+  "keywords": [
+    "excel",
+    "spreadsheet",
+    "table",
+    "data-grid",
+    "datagrid",
+    "react",
+    "react-table",
+    "virtualization",
+    "grid",
+    "statpio"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "vite build --watch",
     "build": "vite build",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "npm run test && npm run build"
   },
   "peerDependencies": {
     "react": ">=18.0.0",

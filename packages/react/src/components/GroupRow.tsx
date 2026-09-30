@@ -1,5 +1,6 @@
 import React from "react";
 import { GroupHeaderItem } from "../model/grouping";
+import { ChevronRightIcon } from "./icons";
 
 export interface GroupRowProps {
   item: GroupHeaderItem;
@@ -31,7 +32,7 @@ export const GroupRow: React.FC<GroupRowProps> = React.memo(
             className="excelat-group-toggle"
             aria-label={isExpanded ? "Collapse group" : "Expand group"}
           >
-            {isExpanded ? "▼" : "▶"}
+            <ChevronRightIcon expanded={isExpanded} size={11} />
           </button>
           <span className="excelat-group-title">
             <span className="excelat-group-col-label">{columnHeader}:</span>{" "}

@@ -1,5 +1,11 @@
 import React from "react";
 import { PaginationConfig } from "../model/types";
+import {
+  ChevronLeftIcon,
+  ChevronRightNavIcon,
+  ChevronsLeftIcon,
+  ChevronsRightIcon,
+} from "./icons";
 
 export interface PaginationProps {
   config: PaginationConfig;
@@ -21,7 +27,7 @@ export const Pagination: React.FC<PaginationProps> = React.memo(
         <div className="excelat-pagination-info excelat-pagination-summary">
           {total > 0 ? (
             <>
-              Showing <strong>{startItem.toLocaleString()}</strong>–
+              Showing <strong>{startItem.toLocaleString()}</strong> -{" "}
               <strong>{endItem.toLocaleString()}</strong> of{" "}
               <strong>{total.toLocaleString()}</strong>
             </>
@@ -59,7 +65,7 @@ export const Pagination: React.FC<PaginationProps> = React.memo(
             aria-label="First page"
             title="First page"
           >
-            «
+            <ChevronsLeftIcon size={12} />
           </button>
           <button
             type="button"
@@ -69,7 +75,7 @@ export const Pagination: React.FC<PaginationProps> = React.memo(
             aria-label="Previous page"
             title="Previous page"
           >
-            ‹
+            <ChevronLeftIcon size={12} />
           </button>
 
           <span className="excelat-page-current">
@@ -84,7 +90,7 @@ export const Pagination: React.FC<PaginationProps> = React.memo(
             aria-label="Next page"
             title="Next page"
           >
-            ›
+            <ChevronRightNavIcon size={12} />
           </button>
           <button
             type="button"
@@ -94,7 +100,7 @@ export const Pagination: React.FC<PaginationProps> = React.memo(
             aria-label="Last page"
             title="Last page"
           >
-            »
+            <ChevronsRightIcon size={12} />
           </button>
         </div>
       </div>

@@ -96,9 +96,12 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
       className = "",
       style,
       readOnly = false,
+      theme,
     },
     ref
   ) => {
+    // Determine theme classes
+    const themeClass = theme === "dark" ? "excelat-theme-dark dark" : theme === "light" ? "excelat-theme-light" : "";
     // Determine mode-based defaults
     const isTableMode = mode === "table";
     const showRowNumbers =
@@ -305,13 +308,11 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
       () => initialState?.grouping?.columns ?? grouping?.columns
     );
     useEffect(() => {
-      if (grouping?.columns !== undefined) {
-        setInternalGroupColumns(grouping.columns);
-      }
+      setInternalGroupColumns(grouping?.columns);
     }, [grouping?.columns]);
 
     const activeGroupColumns =
-      grouping?.columns !== undefined ? grouping.columns : internalGroupColumns;
+      grouping !== undefined ? grouping.columns : internalGroupColumns;
 
     const [internalExpanded, setInternalExpanded] = useState<Record<string, boolean>>(
       () => initialState?.grouping?.expanded || grouping?.expanded || {}
@@ -397,12 +398,13 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
 
     const hasActiveTransformations =
       (isFilteringEnabled && activeFilters.length > 0) ||
-      (grouping?.columns && grouping.columns.length > 0) ||
+      (activeGroupColumns && activeGroupColumns.length > 0) ||
       (pagination !== undefined);
 
+    const defaultInitialRows = isTableMode ? displayRows.length : 100;
     const totalRows = hasActiveTransformations
       ? displayRows.length
-      : Math.max(initialRows ?? 100, displayRows.length);
+      : Math.max(initialRows ?? defaultInitialRows, displayRows.length);
 
     // Row offset for pagination
     const rowOffset = pagination
@@ -1473,7 +1475,7 @@ export const Excelat = forwardRef<ExcelatRef, ExcelatProps>(
 
     return (
       <div
-        className={`excelat excelat-container excelat-mode-${mode} ${className}`}
+        className={`excelat excelat-container excelat-mode-${mode} ${themeClass} ${className}`.trim()}
         style={style}
         onMouseUp={stopDrag}
       >
