@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Search, ChevronRight } from "lucide-react";
+import { Search, ChevronRight, X } from "lucide-react";
 import { DocSectionId } from "../types";
 import { DOC_CATEGORIES } from "../docsData";
 
@@ -39,6 +39,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside className={`docs-sidebar ${isOpen ? "open" : ""}`}>
+      <div className="docs-sidebar-mobile-header">
+        <div className="docs-brand" onClick={() => handleItemClick("overview")}>
+          <img
+            src="/logo.svg"
+            alt="Excelat"
+            width={24}
+            height={24}
+            className="docs-brand-logo-img"
+          />
+          <span className="docs-brand-name">Excelat</span>
+          <span className="docs-brand-badge">v1.0.0</span>
+        </div>
+        <button
+          className="docs-sidebar-close-btn"
+          onClick={onCloseMobile}
+          aria-label="Close navigation"
+        >
+          <X size={18} />
+        </button>
+      </div>
+
       <div className="docs-sidebar-search">
         <div className="docs-search-input-wrapper">
           <Search size={14} className="docs-search-icon" />
@@ -99,6 +120,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         ))}
       </nav>
+
+      <div className="docs-sidebar-footer">
+        <a
+          href="https://statpio.com"
+          target="_blank"
+          rel="noreferrer"
+          className="docs-statpio-badge"
+          title="Used in production on Statpio"
+        >
+          <span className="docs-statpio-pulse"></span>
+          <span>Used on Statpio</span>
+          <svg
+            width="11"
+            height="11"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M7 17L17 7M17 7H7M17 7V17" />
+          </svg>
+        </a>
+      </div>
     </aside>
   );
 };
