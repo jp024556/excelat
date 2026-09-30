@@ -1056,7 +1056,7 @@ Excelat
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/excelat/excelat.git
+git clone https://github.com/jp024556/excelat.git
 cd excelat
 
 # 2. Install dependencies

@@ -127,7 +127,7 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           <a
-            href="https://github.com/excelat/excelat"
+            href="https://github.com/jp024556/excelat"
             target="_blank"
             rel="noreferrer"
             className="docs-icon-btn docs-github-btn"

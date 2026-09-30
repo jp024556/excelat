@@ -25,12 +25,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/excelat/excelat.git",
+    "url": "git+https://github.com/jp024556/excelat.git",
     "directory": "packages/react"
   },
   "homepage": "https://excelat.onstatpio.com",
   "bugs": {
-    "url": "https://github.com/excelat/excelat/issues"
+    "url": "https://github.com/jp024556/excelat/issues"
   },
   "keywords": [
     "excel",
