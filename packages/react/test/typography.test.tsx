@@ -66,7 +66,7 @@ describe("Excelat - Typography & Font Inheritance", () => {
     expect(container.querySelector(".excelat-cell")).toBeTruthy();
   });
 
-  it("confirms fontFamily is NOT exposed as a component prop in V0.1", () => {
+  it("confirms fontFamily is NOT exposed as a component prop", () => {
     // TypeScript type-level check: fontFamily should not exist on ExcelatProps
     type HasFontFamilyProp = "fontFamily" extends keyof ExcelatProps ? true : false;
     const hasFontFamily: HasFontFamilyProp = false;

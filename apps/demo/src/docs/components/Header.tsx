@@ -47,7 +47,7 @@ export const Header: React.FC<HeaderProps> = ({
             className="docs-brand-logo-img"
           />
           <span className="docs-brand-name">Excelat</span>
-          <span className="docs-brand-badge">v0.1.0</span>
+          <span className="docs-brand-badge">v1.0.0</span>
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 {
   "name": "@excelat/react",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "High-performance, keyboard-first React spreadsheet and data grid with zero external dependencies",
   "author": "Excelat",
   "license": "MIT",

@@ -578,7 +578,7 @@ Control the visual treatment of the active cell and selected ranges using `selec
 Excelat does **not bundle, import, or force any font family** (no hardcoded Arial, Inter, Roboto, or system fonts). The root `.excelat` element uses `font-family: inherit;`, so the grid seamlessly and automatically assumes whatever font family your parent application or container specifies.
 
 * **Internal Consistency:** Headers, cells, row numbers, column letters, formula bar, name box, cell editors, custom dropdown editors, and pagination controls all inherit the root font.
-* **No `fontFamily` Prop in V0.1:** Typography is configured cleanly through CSS without adding runtime overhead or non-standard props.
+* **No `fontFamily` Prop:** Typography is configured cleanly through CSS without adding runtime overhead or non-standard props.
 * **Easy CSS Overrides:** Consuming applications can override typography normally via standard CSS:
 
 ```css
